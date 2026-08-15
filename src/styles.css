@@ -26,69 +26,259 @@ button {
   font: inherit;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .library-page {
   min-height: 100vh;
-  display: grid;
-  place-items: center;
   padding: 32px;
 }
 
-.library-card {
-  width: min(760px, 100%);
-  padding: 32px;
+.library-header {
+  width: min(1180px, 100%);
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.library-header h1 {
+  margin: 4px 0 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  letter-spacing: -0.04em;
+}
+
+.eyebrow,
+.section-label {
+  color: #4f46e5;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.library-shell {
+  width: min(1180px, 100%);
+  min-height: 620px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  overflow: hidden;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 16px 50px rgb(15 23 42 / 8%);
 }
 
-.library-card h1 {
-  margin: 8px 0 12px;
-  font-size: clamp(2rem, 5vw, 3rem);
-  letter-spacing: -0.04em;
+.workspace-panel {
+  padding: 20px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
 }
 
-.library-card p {
-  max-width: 62ch;
-  margin: 0;
-  color: #64748b;
-  line-height: 1.65;
+.diagram-panel {
+  min-width: 0;
+  padding: 28px;
 }
 
-.eyebrow {
-  color: #4f46e5;
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.demo-diagram {
-  margin-top: 28px;
+.panel-heading,
+.diagram-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px;
+}
+
+.panel-heading {
+  margin-bottom: 14px;
+}
+
+.panel-heading h2,
+.diagram-heading h2 {
+  margin: 0;
+}
+
+.panel-heading h2 {
+  font-size: 0.95rem;
+}
+
+.panel-heading span {
+  min-width: 28px;
+  padding: 3px 8px;
+  color: #64748b;
+  text-align: center;
+  font-size: 0.75rem;
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.diagram-heading {
+  padding-bottom: 22px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.diagram-heading h2 {
+  margin-top: 3px;
+  font-size: 1.5rem;
+}
+
+.workspace-list,
+.diagram-list {
+  display: grid;
+  gap: 8px;
+}
+
+.workspace-item {
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+
+.workspace-item.selected {
+  background: #ffffff;
+  border-color: #c7d2fe;
+  box-shadow: 0 4px 14px rgb(15 23 42 / 5%);
+}
+
+.workspace-select,
+.diagram-open {
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.workspace-select {
+  padding: 4px 2px 8px;
+  font-weight: 650;
+}
+
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.item-actions button {
+  padding: 3px 0;
+  color: #64748b;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.item-actions button:hover:not(:disabled) {
+  color: #1f2937;
+  text-decoration: underline;
+}
+
+.item-actions .danger-action:hover:not(:disabled) {
+  color: #b91c1c;
+}
+
+.diagram-list {
+  margin-top: 18px;
+}
+
+.diagram-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
 }
 
-.demo-diagram div {
+.diagram-item:hover {
+  border-color: #c7d2fe;
+}
+
+.diagram-open {
+  min-width: 0;
   display: grid;
   gap: 4px;
 }
 
-.demo-diagram span,
+.diagram-open strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagram-open span,
 .editor-title span {
   color: #64748b;
+  font-size: 0.82rem;
+}
+
+.panel-state,
+.empty-state {
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.panel-state {
+  padding: 16px 4px;
   font-size: 0.875rem;
+}
+
+.panel-state p,
+.empty-state p {
+  margin: 0 0 14px;
+}
+
+.empty-state {
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  text-align: center;
+}
+
+.empty-state h2,
+.empty-state h3 {
+  margin: 0 0 8px;
+  color: #334155;
+}
+
+.error-state {
+  color: #b91c1c;
+}
+
+.error-banner {
+  width: min(1180px, 100%);
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+}
+
+.error-banner button {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 .primary-button,
 .secondary-button {
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 9px 13px;
   cursor: pointer;
 }
 
@@ -104,11 +294,11 @@ button {
   border: 1px solid #cbd5e1;
 }
 
-.primary-button:hover {
+.primary-button:hover:not(:disabled) {
   background: #4338ca;
 }
 
-.secondary-button:hover {
+.secondary-button:hover:not(:disabled) {
   background: #f8fafc;
 }
 
@@ -132,8 +322,15 @@ button {
 }
 
 .editor-title {
+  min-width: 0;
   display: grid;
   gap: 1px;
+}
+
+.editor-title span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .editor-canvas {
@@ -142,17 +339,30 @@ button {
   width: 100%;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .library-page {
     padding: 16px;
   }
 
-  .library-card {
-    padding: 22px;
+  .library-header {
+    align-items: flex-end;
   }
 
-  .demo-diagram {
-    align-items: stretch;
+  .library-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-panel {
+    border-right: 0;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .diagram-panel {
+    padding: 20px;
+  }
+
+  .diagram-item {
+    align-items: flex-start;
     flex-direction: column;
   }
 }

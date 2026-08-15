@@ -8,15 +8,15 @@ Implemented:
 
 - React + TypeScript + Vite
 - `@excalidraw/excalidraw` embedded directly as a React component
-- minimal library/editor route boundary
 - self-hosted Excalidraw fonts copied from the installed package
 - R2-backed workspace and diagram API through Cloudflare Pages Functions
 - lightweight diagram metadata stored separately from full Excalidraw documents
+- workspace and diagram management UI backed by the R2 API
+- workspace-aware routes that preserve navigation context when opening the editor
 
 Still intentionally deferred to later MVP issues:
 
-- workspace/diagram management UI
-- editor autosave integration
+- loading persisted diagram content into Excalidraw and autosaving edits
 - Terraform infrastructure
 - CI/CD
 
@@ -62,6 +62,17 @@ workspaces/{workspaceId}/diagrams/{diagramId}/document.excalidraw
 Workspace and diagram IDs are generated UUIDs. Renaming only updates metadata and never moves diagram objects.
 
 Keeping diagram metadata separate from `document.excalidraw` allows the library to list diagrams without downloading complete scenes or embedded files.
+
+## Library routes
+
+The hash routes keep workspace identity explicit so navigation remains stable across refreshes and editor transitions:
+
+```text
+#/workspaces/{workspaceId}
+#/workspaces/{workspaceId}/diagrams/{diagramId}
+```
+
+The library supports create, select, rename, and delete for workspaces, plus create, open, rename, and delete for diagrams. Destructive actions require confirmation and API failures remain visible in the UI.
 
 ## API
 

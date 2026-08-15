@@ -14,6 +14,8 @@ Keep this repository focused on a small, private, self-hosted Excalidraw deploym
 - Browser code must never receive R2 credentials. Persistence goes through Cloudflare Pages Functions and bindings.
 - Validate request input and return small, predictable JSON errors with appropriate HTTP status codes.
 - Keep Cloudflare-specific runtime code inside `functions/` and frontend code inside `src/`.
+- Keep workspace and diagram identity explicit in application routes so reloads and editor navigation do not depend on transient client state.
+- Prefer the existing same-origin API client under `src/services/` over direct backend calls from individual components.
 - Do not implement application authentication; Cloudflare Access is the security boundary for the MVP.
 
 ## Commits
@@ -21,7 +23,3 @@ Keep this repository focused on a small, private, self-hosted Excalidraw deploym
 Use `type(scope): message` and mention the relevant issue whenever possible, for example:
 
 `feat(storage): add R2 workspace persistence for #2`
-
-## Current implementation focus
-
-Issue #2 adds the R2-backed workspace and diagram API. It must support create/list/rename/delete for workspaces and create/list/load/rename/save/delete for diagrams, with local Pages Functions development support.

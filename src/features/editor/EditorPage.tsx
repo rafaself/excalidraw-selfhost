@@ -1,19 +1,24 @@
 import { Excalidraw } from "@excalidraw/excalidraw";
-import { navigateTo } from "../../app/router";
+import { navigateTo, workspacePath } from "../../app/router";
 
 type EditorPageProps = {
+  workspaceId: string;
   diagramId: string;
 };
 
-export function EditorPage({ diagramId }: EditorPageProps) {
+export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   return (
     <main className="editor-page">
       <header className="editor-toolbar">
-        <button className="secondary-button" type="button" onClick={() => navigateTo("/")}>
+        <button
+          className="secondary-button"
+          type="button"
+          onClick={() => navigateTo(workspacePath(workspaceId))}
+        >
           ← Back
         </button>
         <div className="editor-title">
-          <strong>Demo canvas</strong>
+          <strong>Diagram</strong>
           <span>{diagramId}</span>
         </div>
       </header>

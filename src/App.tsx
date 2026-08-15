@@ -1,13 +1,13 @@
+import { useAppRoute } from "./app/router";
 import { EditorPage } from "./features/editor/EditorPage";
 import { LibraryPage } from "./features/library/LibraryPage";
-import { useAppRoute } from "./app/router";
 
 export function App() {
   const route = useAppRoute();
 
   if (route.name === "editor") {
-    return <EditorPage diagramId={route.diagramId} />;
+    return <EditorPage workspaceId={route.workspaceId} diagramId={route.diagramId} />;
   }
 
-  return <LibraryPage />;
+  return <LibraryPage selectedWorkspaceId={route.workspaceId} />;
 }
