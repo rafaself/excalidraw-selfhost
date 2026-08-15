@@ -7,7 +7,7 @@ This directory provisions the minimum production infrastructure for the Excalidr
 - one custom production hostname and its proxied DNS CNAME;
 - Cloudflare Access protection for both the custom hostname and `<project>.pages.dev`.
 
-Application deployments are intentionally not managed by Terraform. Issue #6 deploys the built application to the Pages project from GitHub Actions.
+Application deployments are intentionally not managed by Terraform. GitHub Actions deploys the built application to the existing Pages project after changes reach `main`.
 
 ## Prerequisites
 
@@ -78,4 +78,25 @@ This matches the Pages Functions code under `functions/`, which reads `context.e
 
 ## Deployment handoff
 
-The application deployment workflow only needs the `pages_project_name` output plus a scoped Pages deployment token. It does not need the Terraform token and must not receive DNS, Access, or R2-management privileges.
+Terraform and application deployment intentionally use separate credentials.
+
+After `terraform apply`, read the Pages project name:
+
+```bash
+terraform output -raw pages_project_name
+```
+
+Then configure the GitHub repository under **Settings → Secrets and variables → Actions**.
+
+Repository secrets:
+
+- `CLOUDFLARE_API_TOKEN` — create a separate token with Cloudflare Pages Edit for routine application deployment. Do not reuse the broader Terraform token.
+- `CLOUDFLARE_ACCOUNT_ID` — the account ID that owns the Pages project.
+
+Repository variable:
+
+- `CLOUDFLARE_PAGES_PROJECT_NAME` — the exact `pages_project_name` Terraform output.
+
+The production workflow first validates these values and verifies through the Cloudflare Pages API that the project already exists and has `main` as its production branch. Only then does Wrangler upload `dist/` and the root `functions/` directory as the production deployment.
+
+The deployment token must not receive DNS, Access, R2-management, or other Terraform infrastructure permissions. No GitHub Actions workflow runs `terraform apply`.

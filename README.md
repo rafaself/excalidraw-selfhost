@@ -2,7 +2,7 @@
 
 A small, private-first Excalidraw host designed for Cloudflare Pages, R2, Pages Functions, and Cloudflare Access.
 
-## Current MVP status
+## MVP status
 
 Implemented:
 
@@ -16,15 +16,16 @@ Implemented:
 - persisted Excalidraw document loading and debounced autosave to R2
 - visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
 - Terraform-managed Cloudflare Pages, R2, DNS, and Access infrastructure
+- pull request validation and automatic production deployment from `main`
 
-Still intentionally deferred to later MVP issues:
-
-- CI/CD
+The repository contains the complete MVP implementation. A first production deployment still requires the operator to apply the Terraform configuration and configure the GitHub Actions credentials described below.
 
 ## Requirements
 
 - Node.js 20.19+ or 22.12+
 - npm
+
+CI pins Node.js 22.13.0.
 
 ## Development
 
@@ -125,7 +126,35 @@ Cloudflare Pages
 Pages Functions -- DIAGRAMS binding --> R2
 ```
 
-Infrastructure changes use a manual `terraform plan` / `terraform apply` workflow. Application deployment is deliberately separate and will use a narrower Cloudflare token in CI/CD.
+Infrastructure changes use a manual `terraform plan` / `terraform apply` workflow. Application deployment is deliberately separate and uses a narrower Cloudflare token.
+
+## CI/CD
+
+Two GitHub Actions workflows keep validation and production credentials separated:
+
+```text
+pull request → npm ci → lint → typecheck → build
+main         → npm ci → lint → typecheck → build → Wrangler Pages deploy
+```
+
+`package-lock.json` is committed and all automation uses `npm ci`. GitHub Actions dependencies are pinned to immutable commit SHAs, and checkout does not persist repository credentials.
+
+Before the first production deployment, apply `infra/` and configure the repository under **Settings → Secrets and variables → Actions**.
+
+Repository secrets:
+
+- `CLOUDFLARE_API_TOKEN` — a dedicated deployment token scoped to Cloudflare Pages Edit only; do not reuse the Terraform token.
+- `CLOUDFLARE_ACCOUNT_ID` — the Cloudflare account ID used by Wrangler.
+
+Repository variable:
+
+- `CLOUDFLARE_PAGES_PROJECT_NAME` — set this to `terraform -chdir=infra output -raw pages_project_name`.
+
+The production workflow verifies that the configured Pages project already exists and uses `main` as its production branch before invoking Wrangler. This prevents the CI path from becoming an infrastructure-creation path accidentally.
+
+Only pushes to `main` deploy. `workflow_dispatch` is available for manually retrying the production workflow and only runs the deployment job when dispatched from `main`. No GitHub workflow runs `terraform apply`.
+
+The Pages project is Direct Upload; do not add Cloudflare Git integration as a second deployment path.
 
 ## Quality checks
 

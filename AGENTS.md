@@ -22,6 +22,12 @@ Keep this repository focused on a small, private, self-hosted Excalidraw deploym
 - Keep Terraform production-only and intentionally applied by an operator; routine application deployment must not receive DNS, Access, or R2-management privileges.
 - Keep Cloudflare Pages as a Direct Upload project. GitHub Actions owns application deployment; Terraform owns the project, bindings, DNS, Access, and R2 resources.
 - Protect both the custom production hostname and the production `pages.dev` hostname with Cloudflare Access. Do not introduce application-level authentication.
+- Keep `package-lock.json` committed and use `npm ci` in automation. Do not replace deterministic CI installs with `npm install`.
+- Pin GitHub Actions dependencies to immutable commit SHAs and keep the corresponding release version in a comment for maintainability.
+- Pull request validation must not reference or receive Cloudflare deployment credentials.
+- Production deployment may run only from `main`, must validate the existing Pages project before deployment, and must never create infrastructure implicitly.
+- Use a dedicated Cloudflare Pages deployment token for CI; never reuse the broader Terraform token.
+- Never add `terraform apply` to GitHub Actions for this MVP.
 - Never commit Cloudflare tokens, real `.tfvars`, Terraform state, or other credentials.
 
 ## Commits
