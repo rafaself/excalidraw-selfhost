@@ -51,12 +51,12 @@ pnpm dev:pages
 
 ### Local app with a remote R2 bucket
 
-Wrangler remote bindings let the application and Pages Functions execute locally while R2 operations are proxied to a real bucket in Cloudflare.
+Wrangler remote bindings let the application and Pages Functions execute locally while R2 operations are proxied to a real bucket in Cloudflare. Pages only supports the standard `wrangler.jsonc` file in the project root for this configuration.
 
 Create your local configuration from the committed example:
 
 ```bash
-cp wrangler.remote.jsonc.example wrangler.remote.jsonc
+cp wrangler.jsonc.example wrangler.jsonc
 ```
 
 Edit only the local file and set the bucket you want to use:
@@ -85,9 +85,9 @@ Then start the complete local application against that remote bucket:
 pnpm dev:remote
 ```
 
-The actual `wrangler.remote.jsonc` is ignored by Git so account- and bucket-specific development settings are never committed. The example intentionally remains a local-development configuration rather than a deployment configuration.
+The actual `wrangler.jsonc` is ignored by Git so account- and bucket-specific development settings are never committed. The `pnpm dev:pages` script passes its own `--r2=DIAGRAMS` binding, which takes precedence and keeps that mode on Wrangler's local R2 simulation. The `pnpm dev:remote` script uses the `remote: true` binding from `wrangler.jsonc`.
 
-Use a dedicated development R2 bucket whenever possible. If you point `wrangler.remote.jsonc` at the production bucket, normal create, save, rename, and delete operations from the local application will mutate real production data.
+Use a dedicated development R2 bucket whenever possible. If you point `wrangler.jsonc` at the production bucket, normal create, save, rename, and delete operations from the local application will mutate real production data.
 
 No R2 access key or secret is exposed to browser code in either local mode. Pages Functions access `context.env.DIAGRAMS`; Wrangler either supplies the local simulation or proxies that binding to the configured remote bucket.
 

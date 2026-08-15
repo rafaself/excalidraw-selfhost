@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "dev:pages": "pnpm run build && wrangler pages dev dist --r2=DIAGRAMS",
-    "dev:remote": "pnpm run build && wrangler pages dev dist --config wrangler.remote.jsonc",
+    "dev:remote": "pnpm run build && wrangler pages dev dist",
     "build": "pnpm run typecheck && vite build",
     "preview": "vite preview",
     "lint": "eslint src functions",

@@ -15,6 +15,7 @@ public/excalidraw-assets/
 
 # Cloudflare / Wrangler
 .wrangler/
+wrangler.jsonc
 wrangler.remote.jsonc
 
 # Terraform
