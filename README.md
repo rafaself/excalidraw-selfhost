@@ -16,7 +16,7 @@ R2 persistence, workspace CRUD, autosave, Terraform, and CI/CD are intentionally
 
 ## Requirements
 
-- Node.js 22 or a compatible current Node.js release
+- Node.js 20.19+ or 22.12+
 - npm
 
 ## Development
