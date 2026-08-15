@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "excalidraw-selfhost-local-remote",
+  "compatibility_date": "2026-08-15",
+  "r2_buckets": [
+    {
+      "binding": "DIAGRAMS",
+      "bucket_name": "replace-with-development-r2-bucket",
+      "remote": true
+    }
+  ]
+}

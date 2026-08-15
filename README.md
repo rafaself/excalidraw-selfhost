@@ -29,10 +29,10 @@ CI pins Node.js 22.13.0.
 
 ## Development
 
-Install dependencies:
+Install dependencies from the committed lockfile:
 
 ```bash
-npm install
+npm ci
 ```
 
 For frontend-only development:
@@ -49,7 +49,47 @@ npm run dev:pages
 
 `dev:pages` builds the Vite application and starts `wrangler pages dev` with a local `DIAGRAMS` R2 binding. Wrangler persists the local R2 simulation under `.wrangler/`, which is ignored by Git.
 
-No R2 access key or secret is exposed to browser code. Production uses the same `DIAGRAMS` binding provisioned by Terraform.
+### Local app with a remote R2 bucket
+
+Wrangler remote bindings let the application and Pages Functions execute locally while R2 operations are proxied to a real bucket in Cloudflare.
+
+Create your local configuration from the committed example:
+
+```bash
+cp wrangler.remote.jsonc.example wrangler.remote.jsonc
+```
+
+Edit only the local file and set the bucket you want to use:
+
+```jsonc
+{
+  "r2_buckets": [
+    {
+      "binding": "DIAGRAMS",
+      "bucket_name": "your-development-r2-bucket",
+      "remote": true
+    }
+  ]
+}
+```
+
+Authenticate Wrangler interactively:
+
+```bash
+npx wrangler login
+```
+
+Then start the complete local application against that remote bucket:
+
+```bash
+npm run dev:remote
+```
+
+The actual `wrangler.remote.jsonc` is ignored by Git so account- and bucket-specific development settings are never committed. The example intentionally remains a local-development configuration rather than a deployment configuration.
+
+Use a dedicated development R2 bucket whenever possible. If you point `wrangler.remote.jsonc` at the production bucket, normal create, save, rename, and delete operations from the local application will mutate real production data.
+
+No R2 access key or secret is exposed to browser code in either local mode. Pages Functions access `context.env.DIAGRAMS`; Wrangler either supplies the local simulation or proxies that binding to the configured remote bucket.
 
 ## Storage model
 
