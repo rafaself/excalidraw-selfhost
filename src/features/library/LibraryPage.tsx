@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { diagramPath, navigateTo, workspacePath } from "../../app/router";
 import {
   createDiagram,
@@ -18,6 +18,21 @@ type LoadState = "loading" | "ready" | "error";
 type LibraryPageProps = {
   selectedWorkspaceId?: string;
 };
+
+type DialogState =
+  | {
+      kind: "name";
+      title: string;
+      value: string;
+      error?: string;
+      submit: (name: string) => void | Promise<void>;
+    }
+  | {
+      kind: "confirm";
+      title: string;
+      message: string;
+      confirm: () => void | Promise<void>;
+    };
 
 function sortByName<T extends { name: string }>(items: T[]): T[] {
   return [...items].sort((left, right) => left.name.localeCompare(right.name));
@@ -51,6 +66,7 @@ export function LibraryPage({ selectedWorkspaceId }: LibraryPageProps) {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [workspaceReloadKey, setWorkspaceReloadKey] = useState(0);
   const [diagramReloadKey, setDiagramReloadKey] = useState(0);
+  const [dialog, setDialog] = useState<DialogState | null>(null);
 
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId);
   const actionsDisabled = busyAction !== null;
@@ -133,115 +149,202 @@ export function LibraryPage({ selectedWorkspaceId }: LibraryPageProps) {
     }
   }
 
-  function askForName(label: string, currentName?: string): string | null {
-    const value = window.prompt(label, currentName ?? "");
+  function openNameDialog(
+    title: string,
+    currentName: string,
+    submit: (name: string) => void | Promise<void>,
+  ) {
+    setActionError(null);
+    setDialog({ kind: "name", title, value: currentName, submit });
+  }
 
-    if (value === null) {
-      return null;
-    }
+  function openConfirmDialog(title: string, message: string, confirm: () => void | Promise<void>) {
+    setActionError(null);
+    setDialog({ kind: "confirm", title, message, confirm });
+  }
 
-    const name = value.trim();
+  function handleDialogSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!dialog || dialog.kind !== "name") return;
+
+    const name = dialog.value.trim();
 
     if (!name) {
-      setActionError("Name cannot be empty.");
-      return null;
+      setDialog((current) =>
+        current?.kind === "name" ? { ...current, error: "Name cannot be empty." } : current,
+      );
+      return;
     }
 
-    return name;
+    const submit = dialog.submit;
+    setDialog(null);
+    void submit(name);
   }
 
-  async function handleCreateWorkspace() {
-    const name = askForName("Workspace name");
-    if (!name) return;
+  function handleDialogConfirm() {
+    if (!dialog || dialog.kind !== "confirm") return;
 
-    const result = await runAction("create-workspace", () => createWorkspace(name));
-    if (!result) return;
-
-    setWorkspaces((current) => sortByName([...current, result.workspace]));
-    navigateTo(workspacePath(result.workspace.id));
+    const confirm = dialog.confirm;
+    setDialog(null);
+    void confirm();
   }
 
-  async function handleRenameWorkspace(workspace: Workspace) {
-    const name = askForName("Rename workspace", workspace.name);
-    if (!name || name === workspace.name) return;
+  function handleCreateWorkspace() {
+    openNameDialog("Create workspace", "", async (name) => {
+      const result = await runAction("create-workspace", () => createWorkspace(name));
+      if (!result) return;
 
-    const result = await runAction(`rename-workspace-${workspace.id}`, () =>
-      renameWorkspace(workspace.id, name),
-    );
-    if (!result) return;
-
-    setWorkspaces((current) =>
-      sortByName(current.map((item) => (item.id === workspace.id ? result.workspace : item))),
-    );
+      setWorkspaces((current) => sortByName([...current, result.workspace]));
+      navigateTo(workspacePath(result.workspace.id));
+    });
   }
 
-  async function handleDeleteWorkspace(workspace: Workspace) {
-    const confirmed = window.confirm(
+  function handleRenameWorkspace(workspace: Workspace) {
+    openNameDialog("Rename workspace", workspace.name, async (name) => {
+      if (name === workspace.name) return;
+
+      const result = await runAction(`rename-workspace-${workspace.id}`, () =>
+        renameWorkspace(workspace.id, name),
+      );
+      if (!result) return;
+
+      setWorkspaces((current) =>
+        sortByName(current.map((item) => (item.id === workspace.id ? result.workspace : item))),
+      );
+    });
+  }
+
+  function handleDeleteWorkspace(workspace: Workspace) {
+    openConfirmDialog(
+      "Delete workspace",
       `Delete workspace “${workspace.name}” and all diagrams inside it? This cannot be undone.`,
-    );
-    if (!confirmed) return;
+      async () => {
+        const result = await runAction(`delete-workspace-${workspace.id}`, async () => {
+          await deleteWorkspace(workspace.id);
+          return true;
+        });
+        if (!result) return;
 
-    const result = await runAction(`delete-workspace-${workspace.id}`, async () => {
-      await deleteWorkspace(workspace.id);
-      return true;
+        const remaining = workspaces.filter((item) => item.id !== workspace.id);
+        setWorkspaces(remaining);
+
+        if (workspace.id === selectedWorkspaceId) {
+          setDiagrams([]);
+          navigateTo(remaining[0] ? workspacePath(remaining[0].id) : "/");
+        }
+      },
+    );
+  }
+
+  function handleCreateDiagram() {
+    if (!selectedWorkspace) return;
+
+    openNameDialog("Create diagram", "", async (name) => {
+      const result = await runAction("create-diagram", () => createDiagram(selectedWorkspace.id, name));
+      if (!result) return;
+
+      setDiagrams((current) => sortByName([...current, result.diagram]));
+      navigateTo(diagramPath(selectedWorkspace.id, result.diagram.id));
     });
-    if (!result) return;
-
-    const remaining = workspaces.filter((item) => item.id !== workspace.id);
-    setWorkspaces(remaining);
-
-    if (workspace.id === selectedWorkspaceId) {
-      setDiagrams([]);
-      navigateTo(remaining[0] ? workspacePath(remaining[0].id) : "/");
-    }
   }
 
-  async function handleCreateDiagram() {
+  function handleRenameDiagram(diagram: Diagram) {
     if (!selectedWorkspace) return;
 
-    const name = askForName("Diagram name");
-    if (!name) return;
+    openNameDialog("Rename diagram", diagram.name, async (name) => {
+      if (name === diagram.name) return;
 
-    const result = await runAction("create-diagram", () => createDiagram(selectedWorkspace.id, name));
-    if (!result) return;
+      const result = await runAction(`rename-diagram-${diagram.id}`, () =>
+        renameDiagram(selectedWorkspace.id, diagram.id, name),
+      );
+      if (!result) return;
 
-    setDiagrams((current) => sortByName([...current, result.diagram]));
-    navigateTo(diagramPath(selectedWorkspace.id, result.diagram.id));
-  }
-
-  async function handleRenameDiagram(diagram: Diagram) {
-    if (!selectedWorkspace) return;
-
-    const name = askForName("Rename diagram", diagram.name);
-    if (!name || name === diagram.name) return;
-
-    const result = await runAction(`rename-diagram-${diagram.id}`, () =>
-      renameDiagram(selectedWorkspace.id, diagram.id, name),
-    );
-    if (!result) return;
-
-    setDiagrams((current) =>
-      sortByName(current.map((item) => (item.id === diagram.id ? result.diagram : item))),
-    );
-  }
-
-  async function handleDeleteDiagram(diagram: Diagram) {
-    if (!selectedWorkspace) return;
-
-    const confirmed = window.confirm(`Delete diagram “${diagram.name}”? This cannot be undone.`);
-    if (!confirmed) return;
-
-    const result = await runAction(`delete-diagram-${diagram.id}`, async () => {
-      await deleteDiagram(selectedWorkspace.id, diagram.id);
-      return true;
+      setDiagrams((current) =>
+        sortByName(current.map((item) => (item.id === diagram.id ? result.diagram : item))),
+      );
     });
-    if (!result) return;
-
-    setDiagrams((current) => current.filter((item) => item.id !== diagram.id));
   }
+
+  function handleDeleteDiagram(diagram: Diagram) {
+    if (!selectedWorkspace) return;
+
+    openConfirmDialog(
+      "Delete diagram",
+      `Delete diagram “${diagram.name}”? This cannot be undone.`,
+      async () => {
+        const result = await runAction(`delete-diagram-${diagram.id}`, async () => {
+          await deleteDiagram(selectedWorkspace.id, diagram.id);
+          return true;
+        });
+        if (!result) return;
+
+        setDiagrams((current) => current.filter((item) => item.id !== diagram.id));
+      },
+    );
+  }
+
+  function closeDialog() {
+    setDialog(null);
+  }
+
+  function updateDialogValue(value: string) {
+    setDialog((current) =>
+      current?.kind === "name" ? { ...current, value, error: undefined } : current,
+    );
+  }
+
+  const dialogContent = dialog?.kind === "name" ? (
+    <form
+      className="dialog"
+      role="dialog"
+      aria-labelledby="dialog-title"
+      aria-modal="true"
+      onSubmit={handleDialogSubmit}
+    >
+      <h2 id="dialog-title">{dialog.title}</h2>
+      <label htmlFor="dialog-name">Name</label>
+      <input
+        id="dialog-name"
+        type="text"
+        value={dialog.value}
+        onChange={(event) => updateDialogValue(event.target.value)}
+        autoFocus
+      />
+      {dialog.error ? <p className="dialog-error">{dialog.error}</p> : null}
+      <div className="dialog-actions">
+        <button className="secondary-button" type="button" onClick={closeDialog}>
+          Cancel
+        </button>
+        <button className="primary-button" type="submit">
+          Save
+        </button>
+      </div>
+    </form>
+  ) : dialog?.kind === "confirm" ? (
+    <div className="dialog" role="dialog" aria-labelledby="dialog-title" aria-modal="true">
+      <h2 id="dialog-title">{dialog.title}</h2>
+      <p>{dialog.message}</p>
+      <div className="dialog-actions">
+        <button className="secondary-button" type="button" onClick={closeDialog}>
+          Cancel
+        </button>
+        <button className="danger-button" type="button" onClick={handleDialogConfirm}>
+          Delete
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const dialogOverlay = dialogContent ? (
+    <div className="dialog-backdrop" role="presentation">
+      {dialogContent}
+    </div>
+  ) : null;
 
   return (
-    <main className="library-page">
+    <>
+      <main className="library-page">
       <header className="library-header">
         <div>
           <div className="eyebrow">Self-hosted Excalidraw</div>
@@ -436,6 +539,8 @@ export function LibraryPage({ selectedWorkspaceId }: LibraryPageProps) {
           )}
         </section>
       </section>
-    </main>
+      </main>
+      {dialogOverlay}
+    </>
   );
 }

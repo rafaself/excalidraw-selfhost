@@ -275,6 +275,85 @@ button:disabled {
   text-decoration: underline;
 }
 
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 45%);
+}
+
+.dialog {
+  width: min(420px, 100%);
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 25%);
+}
+
+.dialog h2 {
+  margin: 0 0 18px;
+  color: #1e293b;
+  font-size: 1.2rem;
+}
+
+.dialog p {
+  margin: 0 0 20px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.dialog label {
+  display: block;
+  margin-bottom: 7px;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.dialog input {
+  width: 100%;
+  padding: 10px 11px;
+  color: #1f2937;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.dialog input:focus {
+  outline: 3px solid rgb(99 102 241 / 20%);
+  border-color: #6366f1;
+}
+
+.dialog-error {
+  margin: 8px 0 0 !important;
+  color: #b91c1c !important;
+  font-size: 0.85rem;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.danger-button {
+  padding: 9px 13px;
+  color: #ffffff;
+  background: #b91c1c;
+  border: 1px solid #b91c1c;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.danger-button:hover:not(:disabled) {
+  background: #991b1b;
+}
+
 .primary-button,
 .secondary-button {
   border-radius: 8px;
