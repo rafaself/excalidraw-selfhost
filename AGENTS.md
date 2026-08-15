@@ -16,6 +16,9 @@ Keep this repository focused on a small, private, self-hosted Excalidraw deploym
 - Keep Cloudflare-specific runtime code inside `functions/` and frontend code inside `src/`.
 - Keep workspace and diagram identity explicit in application routes so reloads and editor navigation do not depend on transient client state.
 - Prefer the existing same-origin API client under `src/services/` over direct backend calls from individual components.
+- Load persisted scenes through Excalidraw's `restore()` utility and persist editor state through `serializeAsJSON(..., "local")`; do not manually store raw runtime `appState`.
+- Autosave must be debounced, canonical-diffed against the last successful persistence, and single-flight so concurrent writes cannot reorder diagram state.
+- Keep editor instances isolated by workspace and diagram identity; never allow pending state from one diagram to be written to another diagram ID.
 - Do not implement application authentication; Cloudflare Access is the security boundary for the MVP.
 
 ## Commits

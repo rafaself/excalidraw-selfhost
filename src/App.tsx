@@ -6,7 +6,15 @@ export function App() {
   const route = useAppRoute();
 
   if (route.name === "editor") {
-    return <EditorPage workspaceId={route.workspaceId} diagramId={route.diagramId} />;
+    const editorKey = `${route.workspaceId}:${route.diagramId}`;
+
+    return (
+      <EditorPage
+        key={editorKey}
+        workspaceId={route.workspaceId}
+        diagramId={route.diagramId}
+      />
+    );
   }
 
   return <LibraryPage selectedWorkspaceId={route.workspaceId} />;

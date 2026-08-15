@@ -1,31 +1,384 @@
-import { Excalidraw } from "@excalidraw/excalidraw";
+import {
+  Excalidraw,
+  restore,
+  serializeAsJSON,
+} from "@excalidraw/excalidraw";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+} from "react";
 import { navigateTo, workspacePath } from "../../app/router";
+import {
+  getDiagram,
+  saveDiagramDocument,
+  type Diagram,
+  type ExcalidrawDocument,
+} from "../../services/api";
+
+const AUTOSAVE_DELAY_MS = 1500;
+
+type ExcalidrawOnChange = NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
+
+type SceneSnapshot = {
+  elements: Parameters<ExcalidrawOnChange>[0];
+  appState: Parameters<ExcalidrawOnChange>[1];
+  files: Parameters<ExcalidrawOnChange>[2];
+};
+
+type SaveState = "saved" | "pending" | "saving" | "error";
+
+type LoadedDiagram = {
+  diagram: Diagram;
+  initialData: ReturnType<typeof restore>;
+};
 
 type EditorPageProps = {
   workspaceId: string;
   diagramId: string;
 };
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong";
+}
+
+function serializeScene(snapshot: SceneSnapshot): string {
+  return serializeAsJSON(snapshot.elements, snapshot.appState, snapshot.files, "local");
+}
+
+function parseSerializedDocument(serialized: string): ExcalidrawDocument {
+  return JSON.parse(serialized) as ExcalidrawDocument;
+}
+
+function restoreDocument(document: ExcalidrawDocument): ReturnType<typeof restore> {
+  return restore(document as Parameters<typeof restore>[0], null, null, {
+    repairBindings: true,
+  });
+}
+
 export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
+  const [loaded, setLoaded] = useState<LoadedDiagram | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+
+  const latestSceneRef = useRef<SceneSnapshot | null>(null);
+  const lastPersistedSerializedRef = useRef<string | null>(null);
+  const changeRevisionRef = useRef(0);
+  const savedRevisionRef = useRef(0);
+  const hydratingRef = useRef(true);
+  const debounceTimerRef = useRef<number | null>(null);
+  const saveLoopPromiseRef = useRef<Promise<boolean> | null>(null);
+  const mountedRef = useRef(true);
+
+  function clearAutosaveTimer() {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }
+
+  function reportSaveState(nextState: SaveState, message: string | null = null) {
+    if (!mountedRef.current) {
+      return;
+    }
+
+    setSaveState(nextState);
+    setSaveError(message);
+  }
+
+  async function drainSaveLoop(reportStatus: boolean): Promise<boolean> {
+    while (true) {
+      const snapshot = latestSceneRef.current;
+      const revision = changeRevisionRef.current;
+
+      if (!snapshot) {
+        if (reportStatus) {
+          reportSaveState("saved");
+        }
+        return true;
+      }
+
+      const serialized = serializeScene(snapshot);
+
+      if (serialized === lastPersistedSerializedRef.current) {
+        savedRevisionRef.current = revision;
+        if (reportStatus) {
+          reportSaveState("saved");
+        }
+        return true;
+      }
+
+      if (reportStatus) {
+        reportSaveState("saving");
+      }
+
+      try {
+        await saveDiagramDocument(
+          workspaceId,
+          diagramId,
+          parseSerializedDocument(serialized),
+        );
+      } catch (error) {
+        if (reportStatus) {
+          reportSaveState("error", errorMessage(error));
+        }
+        return false;
+      }
+
+      lastPersistedSerializedRef.current = serialized;
+      savedRevisionRef.current = revision;
+
+      if (changeRevisionRef.current === revision) {
+        if (reportStatus) {
+          reportSaveState("saved");
+        }
+        return true;
+      }
+    }
+  }
+
+  function flushPendingSave(reportStatus = true): Promise<boolean> {
+    clearAutosaveTimer();
+
+    if (saveLoopPromiseRef.current) {
+      return saveLoopPromiseRef.current;
+    }
+
+    const promise = drainSaveLoop(reportStatus);
+    saveLoopPromiseRef.current = promise;
+
+    void promise.finally(() => {
+      if (saveLoopPromiseRef.current === promise) {
+        saveLoopPromiseRef.current = null;
+      }
+    });
+
+    return promise;
+  }
+
+  function scheduleAutosave() {
+    clearAutosaveTimer();
+    debounceTimerRef.current = window.setTimeout(() => {
+      debounceTimerRef.current = null;
+      void flushPendingSave();
+    }, AUTOSAVE_DELAY_MS);
+  }
+
+  function hasPotentialUnsavedChanges(): boolean {
+    return (
+      changeRevisionRef.current !== savedRevisionRef.current ||
+      saveLoopPromiseRef.current !== null
+    );
+  }
+
+  const handleChange: ExcalidrawOnChange = (elements, appState, files) => {
+    const snapshot: SceneSnapshot = { elements, appState, files };
+    latestSceneRef.current = snapshot;
+    changeRevisionRef.current += 1;
+
+    if (hydratingRef.current) {
+      lastPersistedSerializedRef.current = serializeScene(snapshot);
+      savedRevisionRef.current = changeRevisionRef.current;
+      clearAutosaveTimer();
+      reportSaveState("saved");
+      return;
+    }
+
+    reportSaveState("pending");
+    scheduleAutosave();
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      clearAutosaveTimer();
+      if (hasPotentialUnsavedChanges()) {
+        void flushPendingSave(false);
+      }
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    clearAutosaveTimer();
+    latestSceneRef.current = null;
+    lastPersistedSerializedRef.current = null;
+    changeRevisionRef.current = 0;
+    savedRevisionRef.current = 0;
+    hydratingRef.current = true;
+    setLoaded(null);
+    setLoadError(null);
+    reportSaveState("saved");
+
+    void getDiagram(workspaceId, diagramId, controller.signal)
+      .then(({ diagram, document }) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        const restored = restoreDocument(document);
+        lastPersistedSerializedRef.current = serializeAsJSON(
+          restored.elements,
+          restored.appState,
+          restored.files,
+          "local",
+        );
+        setLoaded({ diagram, initialData: restored });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          hydratingRef.current = false;
+          setLoadError(errorMessage(error));
+        }
+      });
+
+    return () => controller.abort();
+  }, [workspaceId, diagramId, loadAttempt]);
+
+  useEffect(() => {
+    if (!loaded) {
+      return;
+    }
+
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        hydratingRef.current = false;
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) {
+        window.cancelAnimationFrame(secondFrame);
+      }
+    };
+  }, [loaded?.diagram.id]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden" && hasPotentialUnsavedChanges()) {
+        void flushPendingSave();
+      }
+    };
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasPotentialUnsavedChanges()) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, []);
+
+  async function handleBack() {
+    setIsLeaving(true);
+    const saved = await flushPendingSave();
+
+    if (saved) {
+      navigateTo(workspacePath(workspaceId));
+      return;
+    }
+
+    if (mountedRef.current) {
+      setIsLeaving(false);
+    }
+  }
+
+  function retryLoad() {
+    setLoadAttempt((attempt) => attempt + 1);
+  }
+
+  const saveLabel =
+    saveState === "error"
+      ? "Save failed"
+      : saveState === "saved"
+        ? "Saved"
+        : "Saving…";
+
   return (
     <main className="editor-page">
       <header className="editor-toolbar">
         <button
           className="secondary-button"
           type="button"
-          onClick={() => navigateTo(workspacePath(workspaceId))}
+          disabled={isLeaving}
+          onClick={() => void handleBack()}
         >
-          ← Back
+          {isLeaving ? "Saving…" : "← Back"}
         </button>
+
         <div className="editor-title">
-          <strong>Diagram</strong>
+          <strong>{loaded?.diagram.name ?? "Diagram"}</strong>
           <span>{diagramId}</span>
         </div>
+
+        {loaded ? (
+          <div className="editor-save-state" aria-live="polite">
+            <span
+              className={`save-indicator ${saveState}`}
+              title={saveError ?? undefined}
+            >
+              {saveLabel}
+            </span>
+            {saveState === "error" ? (
+              <button
+                className="save-retry"
+                type="button"
+                onClick={() => void flushPendingSave()}
+              >
+                Retry
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
-      <div className="editor-canvas" aria-label="Excalidraw editor">
-        <Excalidraw />
-      </div>
+      {!loaded ? (
+        <section className="editor-state" role={loadError ? "alert" : "status"}>
+          {loadError ? (
+            <div>
+              <h2>Could not load diagram</h2>
+              <p>{loadError}</p>
+              <button className="secondary-button" type="button" onClick={retryLoad}>
+                Retry
+              </button>
+            </div>
+          ) : (
+            <p>Loading diagram…</p>
+          )}
+        </section>
+      ) : (
+        <div className="editor-canvas" aria-label="Excalidraw editor">
+          <Excalidraw
+            initialData={loaded.initialData}
+            name={loaded.diagram.name}
+            onChange={handleChange}
+            UIOptions={{
+              canvasActions: {
+                loadScene: false,
+                saveToActiveFile: false,
+              },
+            }}
+          />
+        </div>
+      )}
     </main>
   );
 }

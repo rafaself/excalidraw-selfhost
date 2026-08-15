@@ -13,6 +13,16 @@ export type Diagram = {
   updatedAt: string;
 };
 
+export type ExcalidrawDocument = {
+  type: "excalidraw";
+  version: number;
+  source?: string;
+  elements: unknown[];
+  appState: Record<string, unknown>;
+  files?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
 type ApiErrorBody = {
   error?: {
     code?: string;
@@ -105,6 +115,17 @@ export function createDiagram(
   });
 }
 
+export function getDiagram(
+  workspaceId: string,
+  diagramId: string,
+  signal?: AbortSignal,
+): Promise<{ diagram: Diagram; document: ExcalidrawDocument }> {
+  return requestJson(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/diagrams/${encodeURIComponent(diagramId)}`,
+    { signal },
+  );
+}
+
 export function renameDiagram(
   workspaceId: string,
   diagramId: string,
@@ -115,6 +136,20 @@ export function renameDiagram(
     {
       method: "PATCH",
       body: JSON.stringify({ name }),
+    },
+  );
+}
+
+export function saveDiagramDocument(
+  workspaceId: string,
+  diagramId: string,
+  document: ExcalidrawDocument,
+): Promise<{ diagram: Diagram }> {
+  return requestJson(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/diagrams/${encodeURIComponent(diagramId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(document),
     },
   );
 }

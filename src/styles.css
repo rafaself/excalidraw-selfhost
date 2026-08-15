@@ -333,6 +333,69 @@ button:disabled {
   white-space: nowrap;
 }
 
+.editor-save-state {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.save-indicator {
+  min-width: 82px;
+  padding: 5px 9px;
+  color: #475569;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 650;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+}
+
+.save-indicator.pending,
+.save-indicator.saving {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+
+.save-indicator.error {
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.save-retry {
+  padding: 4px 0;
+  color: #991b1b;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-decoration: underline;
+}
+
+.editor-state {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  color: #64748b;
+  text-align: center;
+}
+
+.editor-state h2 {
+  margin: 0 0 8px;
+  color: #334155;
+}
+
+.editor-state p {
+  max-width: 60ch;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
 .editor-canvas {
   flex: 1;
   min-height: 0;
@@ -364,5 +427,17 @@ button:disabled {
   .diagram-item {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .editor-toolbar {
+    gap: 10px;
+  }
+
+  .editor-title span {
+    display: none;
+  }
+
+  .save-indicator {
+    min-width: auto;
   }
 }

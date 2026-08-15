@@ -13,10 +13,11 @@ Implemented:
 - lightweight diagram metadata stored separately from full Excalidraw documents
 - workspace and diagram management UI backed by the R2 API
 - workspace-aware routes that preserve navigation context when opening the editor
+- persisted Excalidraw document loading and debounced autosave to R2
+- visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
 
 Still intentionally deferred to later MVP issues:
 
-- loading persisted diagram content into Excalidraw and autosaving edits
 - Terraform infrastructure
 - CI/CD
 
@@ -73,6 +74,18 @@ The hash routes keep workspace identity explicit so navigation remains stable ac
 ```
 
 The library supports create, select, rename, and delete for workspaces, plus create, open, rename, and delete for diagrams. Destructive actions require confirmation and API failures remain visible in the UI.
+
+Each editor route is mounted as an identity-isolated instance. This prevents pending state from one workspace/diagram pair from being reused by another editor route.
+
+## Diagram persistence
+
+Opening a diagram loads its R2 document and restores it through Excalidraw before rendering the editor.
+
+Editor changes are serialized with Excalidraw's `serializeAsJSON(..., "local")` format, which keeps the editable scene data and referenced binary files while excluding transient runtime state. Autosave uses a 1.5 second debounce and only sends a `PUT` when the canonical serialized document differs from the last successful persistence.
+
+Only one save loop can run at a time. If the scene changes during an in-flight request, the latest scene is persisted before the editor reports `Saved`. A failed request leaves the in-memory drawing untouched and exposes a `Retry` action.
+
+Navigating back through the application flushes pending changes first. Hiding the page triggers a best-effort flush, and the browser receives an unload warning while the editor still has potentially unsaved changes.
 
 ## API
 
