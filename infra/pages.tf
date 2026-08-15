@@ -4,8 +4,14 @@ resource "cloudflare_pages_project" "app" {
   production_branch = "main"
 
   deployment_configs = {
+    preview = {
+      fail_open = false
+    }
+
     production = {
       compatibility_date = var.pages_functions_compatibility_date
+      fail_open          = false
+
       r2_buckets = {
         DIAGRAMS = {
           name = cloudflare_r2_bucket.diagrams.name

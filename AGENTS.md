@@ -24,7 +24,7 @@ Keep this repository focused on a small, private, self-hosted Excalidraw deploym
 - Protect both the custom production hostname and the production `pages.dev` hostname with Cloudflare Access. Do not introduce application-level authentication.
 - Keep local R2 simulation as the default complete development mode. Remote R2 development must use an ignored local Wrangler configuration with `remote: true`, copied from the committed example, so account- and bucket-specific settings never become repository defaults.
 - Prefer a dedicated non-production R2 bucket for remote local development. Pointing the local app at the production bucket must be an explicit operator choice because normal workspace and diagram actions can write and delete remote objects.
-- Keep `package-lock.json` committed and use `npm ci` in automation. Do not replace deterministic CI installs with `npm install`.
+- Keep `pnpm-lock.yaml` committed and use `pnpm install --frozen-lockfile` in automation. Do not replace deterministic CI installs with an unlocked install.
 - Pin GitHub Actions dependencies to immutable commit SHAs and keep the corresponding release version in a comment for maintainability.
 - Pull request validation must not reference or receive Cloudflare deployment credentials.
 - Production deployment may run only from `main`, must validate the existing Pages project before deployment, and must never create infrastructure implicitly.

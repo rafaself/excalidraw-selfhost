@@ -23,7 +23,7 @@ The repository contains the complete MVP implementation. A first production depl
 ## Requirements
 
 - Node.js 20.19+ or 22.12+
-- npm
+- pnpm 11.8.0
 
 CI pins Node.js 22.13.0.
 
@@ -32,19 +32,19 @@ CI pins Node.js 22.13.0.
 Install dependencies from the committed lockfile:
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 ```
 
 For frontend-only development:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 For the complete Pages application with Functions and a locally simulated R2 binding:
 
 ```bash
-npm run dev:pages
+pnpm dev:pages
 ```
 
 `dev:pages` builds the Vite application and starts `wrangler pages dev` with a local `DIAGRAMS` R2 binding. Wrangler persists the local R2 simulation under `.wrangler/`, which is ignored by Git.
@@ -76,13 +76,13 @@ Edit only the local file and set the bucket you want to use:
 Authenticate Wrangler interactively:
 
 ```bash
-npx wrangler login
+pnpm exec wrangler login
 ```
 
 Then start the complete local application against that remote bucket:
 
 ```bash
-npm run dev:remote
+pnpm dev:remote
 ```
 
 The actual `wrangler.remote.jsonc` is ignored by Git so account- and bucket-specific development settings are never committed. The example intentionally remains a local-development configuration rather than a deployment configuration.
@@ -173,11 +173,11 @@ Infrastructure changes use a manual `terraform plan` / `terraform apply` workflo
 Two GitHub Actions workflows keep validation and production credentials separated:
 
 ```text
-pull request → npm ci → lint → typecheck → build
-main         → npm ci → lint → typecheck → build → Wrangler Pages deploy
+pull request → pnpm install --frozen-lockfile → lint → typecheck → build
+main         → pnpm install --frozen-lockfile → lint → typecheck → build → Wrangler Pages deploy
 ```
 
-`package-lock.json` is committed and all automation uses `npm ci`. GitHub Actions dependencies are pinned to immutable commit SHAs, and checkout does not persist repository credentials.
+`pnpm-lock.yaml` is committed and all automation uses `pnpm install --frozen-lockfile`. The project pins pnpm through the `packageManager` field in `package.json`. GitHub Actions dependencies are pinned to immutable commit SHAs, and checkout does not persist repository credentials.
 
 Before the first production deployment, apply `infra/` and configure the repository under **Settings → Secrets and variables → Actions**.
 
@@ -199,16 +199,16 @@ The Pages project is Direct Upload; do not add Cloudflare Git integration as a s
 ## Quality checks
 
 ```bash
-npm run lint
-npm run typecheck
-npm run build
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
 The typecheck command validates frontend code and Pages Functions separately so browser and Workers runtime globals do not conflict.
 
 ## Self-hosted Excalidraw assets
 
-Excalidraw normally loads its bundled fonts from its asset host. To keep this application self-hostable, `npm install` runs `scripts/copy-excalidraw-assets.mjs`, which copies the package fonts into:
+Excalidraw normally loads its bundled fonts from its asset host. To keep this application self-hostable, `pnpm install` runs `scripts/copy-excalidraw-assets.mjs`, which copies the package fonts into:
 
 ```text
 public/excalidraw-assets/fonts/
