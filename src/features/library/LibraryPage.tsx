@@ -9,8 +9,8 @@ export function LibraryPage() {
         <div className="eyebrow">Self-hosted Excalidraw</div>
         <h1>Your diagram workspace</h1>
         <p>
-          The editor bootstrap is ready. Workspace and R2 persistence will plug
-          into this library boundary without changing the editor integration.
+          The R2-backed workspace and diagram API is ready. The management UI will
+          replace this temporary demo entry in the next MVP step.
         </p>
 
         <div className="demo-diagram">
