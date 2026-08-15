@@ -1,0 +1,10 @@
+cloudflare_account_id = "00000000000000000000000000000000"
+cloudflare_zone_id    = "00000000000000000000000000000000"
+
+pages_project_name  = "excalidraw-selfhost"
+r2_bucket_name      = "excalidraw-diagrams"
+production_hostname = "draw.example.com"
+
+# Use the exact identity allowed to reach both the custom hostname and pages.dev.
+# Keep the real value only in ignored local tfvars.
+access_email = "you@example.com"

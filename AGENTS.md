@@ -19,7 +19,10 @@ Keep this repository focused on a small, private, self-hosted Excalidraw deploym
 - Load persisted scenes through Excalidraw's `restore()` utility and persist editor state through `serializeAsJSON(..., "local")`; do not manually store raw runtime `appState`.
 - Autosave must be debounced, canonical-diffed against the last successful persistence, and single-flight so concurrent writes cannot reorder diagram state.
 - Keep editor instances isolated by workspace and diagram identity; never allow pending state from one diagram to be written to another diagram ID.
-- Do not implement application authentication; Cloudflare Access is the security boundary for the MVP.
+- Keep Terraform production-only and intentionally applied by an operator; routine application deployment must not receive DNS, Access, or R2-management privileges.
+- Keep Cloudflare Pages as a Direct Upload project. GitHub Actions owns application deployment; Terraform owns the project, bindings, DNS, Access, and R2 resources.
+- Protect both the custom production hostname and the production `pages.dev` hostname with Cloudflare Access. Do not introduce application-level authentication.
+- Never commit Cloudflare tokens, real `.tfvars`, Terraform state, or other credentials.
 
 ## Commits
 

@@ -15,10 +15,10 @@ Implemented:
 - workspace-aware routes that preserve navigation context when opening the editor
 - persisted Excalidraw document loading and debounced autosave to R2
 - visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
+- Terraform-managed Cloudflare Pages, R2, DNS, and Access infrastructure
 
 Still intentionally deferred to later MVP issues:
 
-- Terraform infrastructure
 - CI/CD
 
 ## Requirements
@@ -48,7 +48,7 @@ npm run dev:pages
 
 `dev:pages` builds the Vite application and starts `wrangler pages dev` with a local `DIAGRAMS` R2 binding. Wrangler persists the local R2 simulation under `.wrangler/`, which is ignored by Git.
 
-No R2 access key or secret is exposed to browser code. Production only needs a Pages R2 binding named `DIAGRAMS`; the actual Cloudflare resource is provisioned by the infrastructure issue.
+No R2 access key or secret is exposed to browser code. Production uses the same `DIAGRAMS` binding provisioned by Terraform.
 
 ## Storage model
 
@@ -109,6 +109,24 @@ Create and rename requests use JSON bodies with a `name` field. `PUT` accepts th
 
 `public/_routes.json` restricts Pages Functions invocation to `/api/*`, leaving static application requests on the Pages static path.
 
+## Infrastructure
+
+Production infrastructure lives under [`infra/`](infra/README.md) and uses the Cloudflare Terraform provider.
+
+Terraform provisions:
+
+```text
+Cloudflare Access
+       ↓
+custom hostname + project.pages.dev
+       ↓
+Cloudflare Pages
+       ↓
+Pages Functions -- DIAGRAMS binding --> R2
+```
+
+Infrastructure changes use a manual `terraform plan` / `terraform apply` workflow. Application deployment is deliberately separate and will use a narrower Cloudflare token in CI/CD.
+
 ## Quality checks
 
 ```bash
@@ -130,20 +148,6 @@ public/excalidraw-assets/fonts/
 `index.html` configures `window.EXCALIDRAW_ASSET_PATH` to `/excalidraw-assets/` before the application starts.
 
 The copied files are generated artifacts and are not committed.
-
-## MVP architecture
-
-```text
-Cloudflare Access
-       ↓
-Cloudflare Pages
-       ↓
-React + Excalidraw
-       ↓
-Pages Functions
-       ↓
-Cloudflare R2
-```
 
 ## License
 
