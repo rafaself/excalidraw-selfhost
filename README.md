@@ -16,6 +16,7 @@ Implemented:
 - persisted Excalidraw document loading and debounced autosave to R2
 - visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
 - Terraform-managed Cloudflare Pages, R2, DNS, and Access infrastructure
+- Cloudflare edge API rate limiting and Pages security headers
 - pull request validation and automatic production deployment from `main`
 
 The repository contains the complete MVP implementation. A first production deployment still requires the operator to apply the Terraform configuration and configure the GitHub Actions credentials described below.
@@ -161,10 +162,14 @@ Cloudflare Access
        ↓
 custom hostname + project.pages.dev
        ↓
+Cloudflare edge rate limit + response headers
+       ↓
 Cloudflare Pages
        ↓
 Pages Functions -- DIAGRAMS binding --> R2
 ```
+
+The custom hostname is the canonical production URL. Terraform protects the production Pages hostname with a separate Access application and rate-limits the canonical `/api/*` entry point at the zone edge before Pages Functions. Pages preview and branch-alias hostnames require the one-time project-level Access policy described in [`infra/README.md`](infra/README.md).
 
 Infrastructure changes use a manual `terraform plan` / `terraform apply` workflow. Application deployment is deliberately separate and uses a narrower Cloudflare token.
 
