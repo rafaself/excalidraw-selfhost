@@ -16,6 +16,7 @@ concurrency:
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
+    environment: production
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -106,8 +107,17 @@ jobs:
             process.exit(1);
           }
 
-          if (body.result.production_branch !== "main") {
+          const project = body.result;
+
+          if (project.production_branch !== "main") {
             console.error("::error::Cloudflare Pages production branch must be main before deployment.");
+            process.exit(1);
+          }
+
+          const diagramsBinding = project.deployment_configs?.production?.r2_buckets?.DIAGRAMS;
+
+          if (!diagramsBinding || typeof diagramsBinding.name !== "string" || diagramsBinding.name.length === 0) {
+            console.error("::error::Configured Cloudflare Pages project is missing the production DIAGRAMS R2 binding.");
             process.exit(1);
           }
           NODE

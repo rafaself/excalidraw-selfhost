@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "dev:pages": "pnpm run build && wrangler pages dev dist --r2=DIAGRAMS",
-    "dev:remote": "pnpm run build && wrangler pages dev dist",
+    "dev:remote": "node scripts/dev-remote.mjs",
     "build": "pnpm run typecheck && vite build",
     "test:api-limits": "node scripts/validate-api-limits.mjs",
     "preview": "vite preview",
