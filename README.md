@@ -106,6 +106,19 @@ Workspace and diagram IDs are generated UUIDs. Renaming only updates metadata an
 
 Keeping diagram metadata separate from `document.excalidraw` allows the library to list diagrams without downloading complete scenes or embedded files.
 
+## R2 operation profile
+
+The storage paths are intentionally shaped around R2 operation cost and bounded Worker work:
+
+```text
+editor load       -> metadata/document reads
+real autosave     -> metadata existence read + one document write
+library list      -> paged R2 list + bounded metadata reads; no document downloads
+workspace delete  -> paged list + batched deletes of at most 1,000 keys
+```
+
+Diagram `updatedAt` is synthesized from the newer of lightweight metadata `updatedAt` and the `uploaded` timestamp of `document.excalidraw`. Autosave therefore does not rewrite `meta.json`; a failed delete page returns an error and a retry safely converges over the remaining R2 objects.
+
 ## Library routes
 
 The hash routes keep workspace identity explicit so navigation remains stable across refreshes and editor transitions:
