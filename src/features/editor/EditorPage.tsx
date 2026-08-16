@@ -1,5 +1,6 @@
 import {
   Excalidraw,
+  MainMenu,
   restore,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
@@ -65,6 +66,36 @@ function restoreDocument(document: ExcalidrawDocument): ReturnType<typeof restor
   return restore(document as Parameters<typeof restore>[0], null, null, {
     repairBindings: true,
   });
+}
+
+function HomeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path
+        d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function SyncIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path
+        d="M20 11a8 8 0 0 0-14.9-3M4 7v4h4m-4 2a8 8 0 0 0 14.9 3M20 17v-4h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
 }
 
 export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
@@ -304,7 +335,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     };
   }, []);
 
-  async function handleBack() {
+  async function handleHome() {
     setIsLeaving(true);
     const saved = await flushPendingSave();
 
@@ -322,50 +353,14 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     setLoadAttempt((attempt) => attempt + 1);
   }
 
-  const saveLabel =
-    saveState === "error"
-      ? "Save failed"
-      : saveState === "saved"
-        ? "Saved"
-        : "Saving…";
+  const syncLabel = "Sync";
 
   return (
     <main className="editor-page">
       <header className="editor-toolbar">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={isLeaving}
-          onClick={() => void handleBack()}
-        >
-          {isLeaving ? "Saving…" : "← Back"}
-        </button>
-
         <div className="editor-title">
           <strong>{loaded?.diagram.name ?? "Diagram"}</strong>
           <span>{diagramId}</span>
-        </div>
-
-        <div className="editor-toolbar-actions">
-          {loaded ? (
-            <div className="editor-save-state" aria-live="polite">
-              <span
-                className={`save-indicator ${saveState}`}
-                title={saveError ?? undefined}
-              >
-                {saveLabel}
-              </span>
-              {saveState === "error" ? (
-                <button
-                  className="save-retry"
-                  type="button"
-                  onClick={() => void flushPendingSave()}
-                >
-                  Retry
-                </button>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       </header>
 
@@ -397,7 +392,48 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
                 toggleTheme: true,
               },
             }}
-          />
+          >
+            <MainMenu>
+              <MainMenu.Item
+                icon={<HomeIcon />}
+                disabled={isLeaving}
+                onSelect={() => void handleHome()}
+              >
+                Home
+              </MainMenu.Item>
+              <MainMenu.DefaultItems.LoadScene />
+              <MainMenu.DefaultItems.SaveToActiveFile />
+              <MainMenu.DefaultItems.Export />
+              <MainMenu.DefaultItems.SaveAsImage />
+              <MainMenu.DefaultItems.SearchMenu />
+              <MainMenu.DefaultItems.Help />
+              <MainMenu.DefaultItems.ClearCanvas />
+              <MainMenu.Separator />
+              <MainMenu.Group title="Excalidraw links">
+                <MainMenu.DefaultItems.Socials />
+              </MainMenu.Group>
+              <MainMenu.Separator />
+              <MainMenu.DefaultItems.ToggleTheme />
+              <MainMenu.DefaultItems.ChangeCanvasBackground />
+              <MainMenu.Separator />
+              <MainMenu.Item
+                className={`editor-menu-sync-item ${saveState}`}
+                disabled
+                icon={<SyncIcon />}
+                aria-label={
+                  saveState === "error"
+                    ? "Sync failed"
+                    : saveState === "saved"
+                      ? "Synced"
+                      : "Syncing"
+                }
+                aria-live="polite"
+                title={saveError ?? undefined}
+              >
+                {syncLabel}
+              </MainMenu.Item>
+            </MainMenu>
+          </Excalidraw>
         </div>
       )}
     </main>
