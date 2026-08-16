@@ -12,6 +12,7 @@
     "dev:pages": "pnpm run build && wrangler pages dev dist --r2=DIAGRAMS",
     "dev:remote": "pnpm run build && wrangler pages dev dist",
     "build": "pnpm run typecheck && vite build",
+    "test:api-limits": "node scripts/validate-api-limits.mjs",
     "preview": "vite preview",
     "lint": "eslint src functions",
     "typecheck": "tsc --noEmit && tsc -p functions/tsconfig.json",

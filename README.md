@@ -199,9 +199,12 @@ The Pages project is Direct Upload; do not add Cloudflare Git integration as a s
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm test:api-limits
 ```
 
 The typecheck command validates frontend code and Pages Functions separately so browser and Workers runtime globals do not conflict.
+
+`test:api-limits` starts a temporary local Pages Functions server with a local R2 simulation and verifies media type validation, malformed JSON, exact request limits, oversized requests with and without `Content-Length`, and valid Excalidraw document saves.
 
 ## Self-hosted Excalidraw assets
 

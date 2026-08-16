@@ -4,6 +4,8 @@ import {
   emptyResponse,
   errorResponse,
   jsonResponse,
+  MAX_DOCUMENT_BODY_BYTES,
+  MAX_METADATA_BODY_BYTES,
   methodNotAllowed,
   readJsonBody,
   requireId,
@@ -36,7 +38,7 @@ export const onRequest: PagesFunction<AppEnv> = async (context) => {
     }
 
     if (context.request.method === "PATCH") {
-      const body = await readJsonBody(context.request);
+      const body = await readJsonBody(context.request, { maxBytes: MAX_METADATA_BODY_BYTES });
       const name = requireName(body);
       const diagram = await renameDiagram(context.env.DIAGRAMS, workspaceId, diagramId, name);
 
@@ -48,7 +50,7 @@ export const onRequest: PagesFunction<AppEnv> = async (context) => {
     }
 
     if (context.request.method === "PUT") {
-      const document = await readJsonBody(context.request);
+      const document = await readJsonBody(context.request, { maxBytes: MAX_DOCUMENT_BODY_BYTES });
 
       if (!isExcalidrawDocument(document)) {
         throw new ApiError(400, "invalid_document", "Body must be a valid Excalidraw document");
