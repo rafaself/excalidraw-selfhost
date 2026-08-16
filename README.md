@@ -185,9 +185,6 @@ Repository secrets:
 
 - `CLOUDFLARE_API_TOKEN` — a dedicated deployment token scoped to Cloudflare Pages Edit only; do not reuse the Terraform token.
 - `CLOUDFLARE_ACCOUNT_ID` — the Cloudflare account ID used by Wrangler.
-
-Repository variable:
-
 - `CLOUDFLARE_PAGES_PROJECT_NAME` — set this to `terraform -chdir=infra output -raw pages_project_name`.
 
 The production workflow verifies that the configured Pages project already exists and uses `main` as its production branch before invoking Wrangler. This prevents the CI path from becoming an infrastructure-creation path accidentally.
