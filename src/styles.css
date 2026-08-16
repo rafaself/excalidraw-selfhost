@@ -19,6 +19,7 @@
   --color-accent-strong: #4338ca;
   --color-accent-soft: #eef2ff;
   --color-accent-border: #c7d2fe;
+  --color-success: #15803d;
   --color-danger: #b91c1c;
   --color-danger-strong: #991b1b;
   --color-danger-soft: #fef2f2;
@@ -50,6 +51,7 @@
   --color-accent-strong: #a5b4fc;
   --color-accent-soft: #24245a;
   --color-accent-border: #4f46e5;
+  --color-success: #86efac;
   --color-danger: #fca5a5;
   --color-danger-strong: #f87171;
   --color-danger-soft: #3b151d;
@@ -572,14 +574,16 @@ button:not(:disabled):active {
 
 .editor-menu-sync-item.saved,
 .editor-menu-sync-item.saved:disabled {
-  color: var(--color-text-muted);
+  color: var(--color-success);
 }
 
-.editor-menu-sync-item.pending,
-.editor-menu-sync-item.pending:disabled,
 .editor-menu-sync-item.saving,
 .editor-menu-sync-item.saving:disabled {
   color: var(--color-warning);
+}
+
+.editor-menu-sync-item.pending {
+  color: var(--color-text-muted);
 }
 
 .editor-menu-sync-item.error,
@@ -590,6 +594,16 @@ button:not(:disabled):active {
 .editor-menu-sync-item:disabled {
   cursor: default;
   opacity: 1;
+}
+
+.editor-menu-sync-icon-loading {
+  animation: editor-sync-spin 1s linear infinite;
+}
+
+@keyframes editor-sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 760px) {
@@ -651,5 +665,9 @@ button:not(:disabled):active {
   *::after {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .editor-menu-sync-icon-loading {
+    animation: none;
   }
 }

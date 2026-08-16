@@ -83,9 +83,14 @@ function HomeIcon() {
   );
 }
 
-function SyncIcon() {
+function SyncIcon({ className }: { className?: string }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      focusable="false"
+    >
       <path
         d="M20 11a8 8 0 0 0-14.9-3M4 7v4h4m-4 2a8 8 0 0 0 14.9 3M20 17v-4h-4"
         fill="none"
@@ -95,6 +100,59 @@ function SyncIcon() {
         strokeWidth="1.5"
       />
     </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path
+        d="m5 12.5 4.5 4.5L19 7.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function ErrorIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M12 8v5m0 3h.01"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function SyncStatusIcon({ saveState }: { saveState: SaveState }) {
+  if (saveState === "saved") {
+    return <CheckIcon />;
+  }
+
+  if (saveState === "error") {
+    return <ErrorIcon />;
+  }
+
+  return (
+    <SyncIcon
+      className={saveState === "saving" ? "editor-menu-sync-icon-loading" : undefined}
+    />
   );
 }
 
@@ -237,6 +295,13 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       return;
     }
 
+    if (serializeScene(snapshot) === lastPersistedSerializedRef.current) {
+      savedRevisionRef.current = changeRevisionRef.current;
+      clearAutosaveTimer();
+      reportSaveState("saved");
+      return;
+    }
+
     reportSaveState("pending");
     scheduleAutosave();
   };
@@ -353,7 +418,9 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     setLoadAttempt((attempt) => attempt + 1);
   }
 
-  const syncLabel = "Sync";
+  const syncLabel =
+    saveState === "saved" ? "Synced" : saveState === "saving" ? "Syncing" : "Sync";
+  const canSync = saveState === "pending" || saveState === "error";
 
   return (
     <main className="editor-page">
@@ -418,14 +485,17 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
               <MainMenu.Separator />
               <MainMenu.Item
                 className={`editor-menu-sync-item ${saveState}`}
-                disabled
-                icon={<SyncIcon />}
+                disabled={!canSync}
+                icon={<SyncStatusIcon saveState={saveState} />}
+                onSelect={canSync ? () => void flushPendingSave() : undefined}
                 aria-label={
                   saveState === "error"
-                    ? "Sync failed"
+                    ? "Sync failed, retry sync"
                     : saveState === "saved"
                       ? "Synced"
-                      : "Syncing"
+                      : saveState === "saving"
+                        ? "Syncing"
+                        : "Sync available"
                 }
                 aria-live="polite"
                 title={saveError ?? undefined}
