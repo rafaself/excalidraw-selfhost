@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "@excalidraw/excalidraw/index.css";
 import { App } from "./App";
+import { ThemeProvider } from "./app/theme";
 import "./styles.css";
 
 const rootElement = document.getElementById("root");
@@ -12,6 +13,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 );

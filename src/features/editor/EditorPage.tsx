@@ -10,6 +10,7 @@ import {
   type ComponentProps,
 } from "react";
 import { navigateTo, workspacePath } from "../../app/router";
+import { useTheme } from "../../app/theme";
 import {
   getDiagram,
   saveDiagramDocument,
@@ -25,6 +26,12 @@ type SceneSnapshot = {
   elements: Parameters<ExcalidrawOnChange>[0];
   appState: Parameters<ExcalidrawOnChange>[1];
   files: Parameters<ExcalidrawOnChange>[2];
+};
+
+type SerializableSceneSnapshot = {
+  elements: SceneSnapshot["elements"];
+  appState: Partial<SceneSnapshot["appState"]>;
+  files: SceneSnapshot["files"];
 };
 
 type SaveState = "saved" | "pending" | "saving" | "error";
@@ -43,8 +50,11 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
-function serializeScene(snapshot: SceneSnapshot): string {
-  return serializeAsJSON(snapshot.elements, snapshot.appState, snapshot.files, "local");
+function serializeScene(snapshot: SerializableSceneSnapshot): string {
+  // The application theme is a local preference, not diagram content.
+  const appState = { ...snapshot.appState, theme: "light" as const };
+
+  return serializeAsJSON(snapshot.elements, appState, snapshot.files, "local");
 }
 
 function parseSerializedDocument(serialized: string): ExcalidrawDocument {
@@ -58,6 +68,7 @@ function restoreDocument(document: ExcalidrawDocument): ReturnType<typeof restor
 }
 
 export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
+  const { theme, setTheme } = useTheme();
   const [loaded, setLoaded] = useState<LoadedDiagram | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -176,6 +187,13 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   }
 
   const handleChange: ExcalidrawOnChange = (elements, appState, files) => {
+    if (
+      (appState.theme === "light" || appState.theme === "dark") &&
+      appState.theme !== theme
+    ) {
+      setTheme(appState.theme);
+    }
+
     const snapshot: SceneSnapshot = { elements, appState, files };
     latestSceneRef.current = snapshot;
     changeRevisionRef.current += 1;
@@ -224,12 +242,11 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
         }
 
         const restored = restoreDocument(document);
-        lastPersistedSerializedRef.current = serializeAsJSON(
-          restored.elements,
-          restored.appState,
-          restored.files,
-          "local",
-        );
+        lastPersistedSerializedRef.current = serializeScene({
+          elements: restored.elements,
+          appState: restored.appState,
+          files: restored.files,
+        });
         setLoaded({ diagram, initialData: restored });
       })
       .catch((error: unknown) => {
@@ -329,25 +346,27 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           <span>{diagramId}</span>
         </div>
 
-        {loaded ? (
-          <div className="editor-save-state" aria-live="polite">
-            <span
-              className={`save-indicator ${saveState}`}
-              title={saveError ?? undefined}
-            >
-              {saveLabel}
-            </span>
-            {saveState === "error" ? (
-              <button
-                className="save-retry"
-                type="button"
-                onClick={() => void flushPendingSave()}
+        <div className="editor-toolbar-actions">
+          {loaded ? (
+            <div className="editor-save-state" aria-live="polite">
+              <span
+                className={`save-indicator ${saveState}`}
+                title={saveError ?? undefined}
               >
-                Retry
-              </button>
-            ) : null}
-          </div>
-        ) : null}
+                {saveLabel}
+              </span>
+              {saveState === "error" ? (
+                <button
+                  className="save-retry"
+                  type="button"
+                  onClick={() => void flushPendingSave()}
+                >
+                  Retry
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </header>
 
       {!loaded ? (
@@ -369,11 +388,13 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           <Excalidraw
             initialData={loaded.initialData}
             name={loaded.diagram.name}
+            theme={theme}
             onChange={handleChange}
             UIOptions={{
               canvasActions: {
                 loadScene: false,
                 saveToActiveFile: false,
+                toggleTheme: true,
               },
             }}
           />
