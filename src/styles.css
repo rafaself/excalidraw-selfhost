@@ -310,8 +310,7 @@ button:not(:disabled):active {
   white-space: nowrap;
 }
 
-.diagram-open span,
-.editor-title span {
+.diagram-open span {
   color: var(--color-text-muted);
   font-size: 0.82rem;
 }
@@ -522,29 +521,6 @@ button:not(:disabled):active {
   background: var(--color-surface);
 }
 
-.editor-toolbar {
-  min-height: 56px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 8px 12px;
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  z-index: 1;
-}
-
-.editor-title {
-  min-width: 0;
-  display: grid;
-  gap: 1px;
-}
-
-.editor-title strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .editor-state {
   flex: 1;
   min-height: 0;
@@ -636,14 +612,6 @@ button:not(:disabled):active {
   .diagram-item {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .editor-toolbar {
-    gap: 10px;
-  }
-
-  .editor-title span {
-    display: none;
   }
 
 }

@@ -424,13 +424,6 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
 
   return (
     <main className="editor-page">
-      <header className="editor-toolbar">
-        <div className="editor-title">
-          <strong>{loaded?.diagram.name ?? "Diagram"}</strong>
-          <span>{diagramId}</span>
-        </div>
-      </header>
-
       {!loaded ? (
         <section className="editor-state" role={loadError ? "alert" : "status"}>
           {loadError ? (
@@ -461,20 +454,22 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
             }}
           >
             <MainMenu>
-              <MainMenu.Item
-                icon={<HomeIcon />}
-                disabled={isLeaving}
-                onSelect={() => void handleHome()}
-              >
-                Home
-              </MainMenu.Item>
-              <MainMenu.DefaultItems.LoadScene />
-              <MainMenu.DefaultItems.SaveToActiveFile />
-              <MainMenu.DefaultItems.Export />
-              <MainMenu.DefaultItems.SaveAsImage />
-              <MainMenu.DefaultItems.SearchMenu />
-              <MainMenu.DefaultItems.Help />
-              <MainMenu.DefaultItems.ClearCanvas />
+              <MainMenu.Group title={loaded.diagram.name}>
+                <MainMenu.Item
+                  icon={<HomeIcon />}
+                  disabled={isLeaving}
+                  onSelect={() => void handleHome()}
+                >
+                  Home
+                </MainMenu.Item>
+                <MainMenu.DefaultItems.LoadScene />
+                <MainMenu.DefaultItems.SaveToActiveFile />
+                <MainMenu.DefaultItems.Export />
+                <MainMenu.DefaultItems.SaveAsImage />
+                <MainMenu.DefaultItems.SearchMenu />
+                <MainMenu.DefaultItems.Help />
+                <MainMenu.DefaultItems.ClearCanvas />
+              </MainMenu.Group>
               <MainMenu.Separator />
               <MainMenu.Group title="Excalidraw links">
                 <MainMenu.DefaultItems.Socials />
