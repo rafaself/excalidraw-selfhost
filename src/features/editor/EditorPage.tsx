@@ -1,5 +1,6 @@
 import {
   Excalidraw,
+  MainMenu,
   restore,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
@@ -10,6 +11,7 @@ import {
   type ComponentProps,
 } from "react";
 import { navigateTo, workspacePath } from "../../app/router";
+import { useTheme } from "../../app/theme";
 import {
   getDiagram,
   saveDiagramDocument,
@@ -25,6 +27,12 @@ type SceneSnapshot = {
   elements: Parameters<ExcalidrawOnChange>[0];
   appState: Parameters<ExcalidrawOnChange>[1];
   files: Parameters<ExcalidrawOnChange>[2];
+};
+
+type SerializableSceneSnapshot = {
+  elements: SceneSnapshot["elements"];
+  appState: Partial<SceneSnapshot["appState"]>;
+  files: SceneSnapshot["files"];
 };
 
 type SaveState = "saved" | "pending" | "saving" | "error";
@@ -43,8 +51,11 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong";
 }
 
-function serializeScene(snapshot: SceneSnapshot): string {
-  return serializeAsJSON(snapshot.elements, snapshot.appState, snapshot.files, "local");
+function serializeScene(snapshot: SerializableSceneSnapshot): string {
+  // The application theme is a local preference, not diagram content.
+  const appState = { ...snapshot.appState, theme: "light" as const };
+
+  return serializeAsJSON(snapshot.elements, appState, snapshot.files, "local");
 }
 
 function parseSerializedDocument(serialized: string): ExcalidrawDocument {
@@ -57,7 +68,96 @@ function restoreDocument(document: ExcalidrawDocument): ReturnType<typeof restor
   });
 }
 
+function HomeIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path
+        d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function SyncIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      viewBox="0 0 24 24"
+      focusable="false"
+    >
+      <path
+        d="M20 11a8 8 0 0 0-14.9-3M4 7v4h4m-4 2a8 8 0 0 0 14.9 3M20 17v-4h-4"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path
+        d="m5 12.5 4.5 4.5L19 7.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function ErrorIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <circle
+        cx="12"
+        cy="12"
+        r="8.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M12 8v5m0 3h.01"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function SyncStatusIcon({ saveState }: { saveState: SaveState }) {
+  if (saveState === "saved") {
+    return <CheckIcon />;
+  }
+
+  if (saveState === "error") {
+    return <ErrorIcon />;
+  }
+
+  return (
+    <SyncIcon
+      className={saveState === "saving" ? "editor-menu-sync-icon-loading" : undefined}
+    />
+  );
+}
+
 export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
+  const { theme, setTheme } = useTheme();
   const [loaded, setLoaded] = useState<LoadedDiagram | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -176,12 +276,26 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   }
 
   const handleChange: ExcalidrawOnChange = (elements, appState, files) => {
+    if (
+      (appState.theme === "light" || appState.theme === "dark") &&
+      appState.theme !== theme
+    ) {
+      setTheme(appState.theme);
+    }
+
     const snapshot: SceneSnapshot = { elements, appState, files };
     latestSceneRef.current = snapshot;
     changeRevisionRef.current += 1;
 
     if (hydratingRef.current) {
       lastPersistedSerializedRef.current = serializeScene(snapshot);
+      savedRevisionRef.current = changeRevisionRef.current;
+      clearAutosaveTimer();
+      reportSaveState("saved");
+      return;
+    }
+
+    if (serializeScene(snapshot) === lastPersistedSerializedRef.current) {
       savedRevisionRef.current = changeRevisionRef.current;
       clearAutosaveTimer();
       reportSaveState("saved");
@@ -224,12 +338,11 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
         }
 
         const restored = restoreDocument(document);
-        lastPersistedSerializedRef.current = serializeAsJSON(
-          restored.elements,
-          restored.appState,
-          restored.files,
-          "local",
-        );
+        lastPersistedSerializedRef.current = serializeScene({
+          elements: restored.elements,
+          appState: restored.appState,
+          files: restored.files,
+        });
         setLoaded({ diagram, initialData: restored });
       })
       .catch((error: unknown) => {
@@ -287,7 +400,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     };
   }, []);
 
-  async function handleBack() {
+  async function handleHome() {
     setIsLeaving(true);
     const saved = await flushPendingSave();
 
@@ -305,51 +418,12 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     setLoadAttempt((attempt) => attempt + 1);
   }
 
-  const saveLabel =
-    saveState === "error"
-      ? "Save failed"
-      : saveState === "saved"
-        ? "Saved"
-        : "Saving…";
+  const syncLabel =
+    saveState === "saved" ? "Synced" : saveState === "saving" ? "Syncing" : "Sync";
+  const canSync = saveState === "pending" || saveState === "error";
 
   return (
     <main className="editor-page">
-      <header className="editor-toolbar">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={isLeaving}
-          onClick={() => void handleBack()}
-        >
-          {isLeaving ? "Saving…" : "← Back"}
-        </button>
-
-        <div className="editor-title">
-          <strong>{loaded?.diagram.name ?? "Diagram"}</strong>
-          <span>{diagramId}</span>
-        </div>
-
-        {loaded ? (
-          <div className="editor-save-state" aria-live="polite">
-            <span
-              className={`save-indicator ${saveState}`}
-              title={saveError ?? undefined}
-            >
-              {saveLabel}
-            </span>
-            {saveState === "error" ? (
-              <button
-                className="save-retry"
-                type="button"
-                onClick={() => void flushPendingSave()}
-              >
-                Retry
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-      </header>
-
       {!loaded ? (
         <section className="editor-state" role={loadError ? "alert" : "status"}>
           {loadError ? (
@@ -369,14 +443,62 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           <Excalidraw
             initialData={loaded.initialData}
             name={loaded.diagram.name}
+            theme={theme}
             onChange={handleChange}
             UIOptions={{
               canvasActions: {
                 loadScene: false,
                 saveToActiveFile: false,
+                toggleTheme: true,
               },
             }}
-          />
+          >
+            <MainMenu>
+              <MainMenu.Group title={loaded.diagram.name}>
+                <MainMenu.Item
+                  icon={<HomeIcon />}
+                  disabled={isLeaving}
+                  onSelect={() => void handleHome()}
+                >
+                  Home
+                </MainMenu.Item>
+                <MainMenu.DefaultItems.LoadScene />
+                <MainMenu.DefaultItems.SaveToActiveFile />
+                <MainMenu.DefaultItems.Export />
+                <MainMenu.DefaultItems.SaveAsImage />
+                <MainMenu.DefaultItems.SearchMenu />
+                <MainMenu.DefaultItems.Help />
+                <MainMenu.DefaultItems.ClearCanvas />
+              </MainMenu.Group>
+              <MainMenu.Separator />
+              <MainMenu.Group title="Excalidraw links">
+                <MainMenu.DefaultItems.Socials />
+              </MainMenu.Group>
+              <MainMenu.Separator />
+              <MainMenu.DefaultItems.ToggleTheme />
+              <MainMenu.DefaultItems.ChangeCanvasBackground />
+              <MainMenu.Separator />
+              <MainMenu.Item
+                className={`editor-menu-sync-item ${saveState}`}
+                disabled={!canSync}
+                icon={<SyncStatusIcon saveState={saveState} />}
+                onSelect={canSync ? () => void flushPendingSave() : undefined}
+                aria-label={
+                  saveState === "error"
+                    ? "Sync failed, retry sync"
+                    : saveState === "saved"
+                      ? "Synced"
+                      : saveState === "saving"
+                        ? "Syncing"
+                        : "Sync available"
+                }
+                aria-live="polite"
+                title={saveError ?? undefined}
+              >
+                {syncLabel}
+              </MainMenu.Item>
+            </MainMenu>
+          </Excalidraw>
         </div>
       )}
     </main>

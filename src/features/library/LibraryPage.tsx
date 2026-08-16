@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
 import { diagramPath, navigateTo, workspacePath } from "../../app/router";
+import { ThemeToggle } from "../../components/ThemeToggle";
 import {
   createDiagram,
   createWorkspace,
@@ -350,14 +351,17 @@ export function LibraryPage({ selectedWorkspaceId }: LibraryPageProps) {
           <div className="eyebrow">Self-hosted Excalidraw</div>
           <h1>Diagrams</h1>
         </div>
-        <button
-          className="primary-button"
-          type="button"
-          disabled={actionsDisabled}
-          onClick={() => void handleCreateWorkspace()}
-        >
-          + Workspace
-        </button>
+        <div className="library-header-actions">
+          <ThemeToggle />
+          <button
+            className="primary-button"
+            type="button"
+            disabled={actionsDisabled}
+            onClick={() => void handleCreateWorkspace()}
+          >
+            + Workspace
+          </button>
+        </div>
       </header>
 
       {actionError ? (

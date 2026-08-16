@@ -1,5 +1,8 @@
 import { MAX_NAME_LENGTH, isRecord, isUuidV4 } from "./domain";
 
+export const MAX_METADATA_BODY_BYTES = 16 * 1024;
+export const MAX_DOCUMENT_BODY_BYTES = 20 * 1024 * 1024;
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -16,10 +19,8 @@ export function jsonResponse(
   status = 200,
   additionalHeaders?: HeadersInit,
 ): Response {
-  const headers = new Headers(additionalHeaders);
+  const headers = apiHeaders(additionalHeaders);
   headers.set("content-type", "application/json; charset=utf-8");
-  headers.set("cache-control", "no-store");
-  headers.set("x-content-type-options", "nosniff");
 
   return new Response(JSON.stringify(body), { status, headers });
 }
@@ -27,10 +28,15 @@ export function jsonResponse(
 export function emptyResponse(status = 204): Response {
   return new Response(null, {
     status,
-    headers: {
-      "cache-control": "no-store",
-    },
+    headers: apiHeaders(),
   });
+}
+
+function apiHeaders(additionalHeaders?: HeadersInit): Headers {
+  const headers = new Headers(additionalHeaders);
+  headers.set("cache-control", "no-store");
+  headers.set("x-content-type-options", "nosniff");
+  return headers;
 }
 
 export function methodNotAllowed(allowedMethods: string[]): Response {
@@ -71,16 +77,80 @@ export function errorResponse(error: unknown): Response {
   );
 }
 
-export async function readJsonBody(request: Request): Promise<unknown> {
+export async function readJsonBody(
+  request: Request,
+  options: { maxBytes: number },
+): Promise<unknown> {
   const contentType = request.headers.get("content-type") ?? "";
 
   if (!contentType.toLowerCase().startsWith("application/json")) {
     throw new ApiError(415, "unsupported_media_type", "Expected application/json");
   }
 
+  const contentLength = request.headers.get("content-length");
+
+  if (contentLength !== null) {
+    const parsedContentLength = Number(contentLength);
+
+    if (
+      Number.isSafeInteger(parsedContentLength) &&
+      parsedContentLength >= 0 &&
+      parsedContentLength > options.maxBytes
+    ) {
+      throw new ApiError(413, "payload_too_large", "Request body is too large");
+    }
+  }
+
+  const reader = request.body?.getReader();
+
+  if (!reader) {
+    throw new ApiError(400, "invalid_json", "Request body must contain valid JSON");
+  }
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
   try {
-    return await request.json();
-  } catch {
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      if (!value) {
+        continue;
+      }
+
+      totalBytes += value.byteLength;
+
+      if (totalBytes > options.maxBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The size rejection must remain deterministic even if cancellation fails.
+        }
+
+        throw new ApiError(413, "payload_too_large", "Request body is too large");
+      }
+
+      chunks.push(value);
+    }
+
+    const body = new Uint8Array(totalBytes);
+    let offset = 0;
+
+    for (const chunk of chunks) {
+      body.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: false }).decode(body));
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
     throw new ApiError(400, "invalid_json", "Request body must contain valid JSON");
   }
 }

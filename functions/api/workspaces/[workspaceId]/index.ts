@@ -3,6 +3,7 @@ import {
   emptyResponse,
   errorResponse,
   jsonResponse,
+  MAX_METADATA_BODY_BYTES,
   methodNotAllowed,
   readJsonBody,
   requireId,
@@ -15,7 +16,7 @@ export const onRequest: PagesFunction<AppEnv> = async (context) => {
     const workspaceId = requireId(context.params.workspaceId, "Workspace ID");
 
     if (context.request.method === "PATCH") {
-      const body = await readJsonBody(context.request);
+      const body = await readJsonBody(context.request, { maxBytes: MAX_METADATA_BODY_BYTES });
       const name = requireName(body);
       const workspace = await renameWorkspace(context.env.DIAGRAMS, workspaceId, name);
 

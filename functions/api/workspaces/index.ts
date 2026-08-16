@@ -1,4 +1,11 @@
-import { errorResponse, jsonResponse, methodNotAllowed, readJsonBody, requireName } from "../../lib/http";
+import {
+  errorResponse,
+  jsonResponse,
+  MAX_METADATA_BODY_BYTES,
+  methodNotAllowed,
+  readJsonBody,
+  requireName,
+} from "../../lib/http";
 import { createWorkspace, listWorkspaces, type AppEnv } from "../../lib/storage";
 
 export const onRequest: PagesFunction<AppEnv> = async (context) => {
@@ -9,7 +16,7 @@ export const onRequest: PagesFunction<AppEnv> = async (context) => {
     }
 
     if (context.request.method === "POST") {
-      const body = await readJsonBody(context.request);
+      const body = await readJsonBody(context.request, { maxBytes: MAX_METADATA_BODY_BYTES });
       const name = requireName(body);
       const workspace = await createWorkspace(context.env.DIAGRAMS, name);
 
