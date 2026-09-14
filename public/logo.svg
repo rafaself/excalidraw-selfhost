@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none">
+  <title>Excalidraw Selfhost Logo</title>
+  <desc>Minimal polished logo with a rounded square and a simple drawn stroke.</desc>
+
+  <!-- Rounded square -->
+  <rect
+    x="12"
+    y="12"
+    width="104"
+    height="104"
+    rx="20"
+    stroke="#6C63FF"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner sketch stroke -->
+  <path
+    d="M36 79
+       C44 68, 51 60, 61 60
+       C69 60, 67 79, 78 79
+       C85 79, 91 72, 96 67"
+    stroke="#6C63FF"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
