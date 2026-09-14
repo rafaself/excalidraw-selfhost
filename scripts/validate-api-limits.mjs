@@ -130,6 +130,7 @@ async function main() {
       "dev",
       "dist",
       "--r2=DIAGRAMS",
+      "--compatibility-date=2026-08-15",
       `--port=${port}`,
       `--persist-to=${stateDirectory}`,
     ],
