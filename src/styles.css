@@ -131,6 +131,18 @@ button:not(:disabled):active {
   gap: 20px;
 }
 
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-logo {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 auto;
+}
+
 .library-header h1 {
   margin: 4px 0 0;
   color: var(--color-text);

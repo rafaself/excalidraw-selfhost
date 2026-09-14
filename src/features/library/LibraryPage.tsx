@@ -346,23 +346,26 @@ export function LibraryPage({ selectedWorkspaceId }: LibraryPageProps) {
   return (
     <>
       <main className="library-page">
-      <header className="library-header">
-        <div>
-          <div className="eyebrow">Self-hosted Excalidraw</div>
-          <h1>Diagrams</h1>
-        </div>
-        <div className="library-header-actions">
-          <ThemeToggle />
-          <button
-            className="primary-button"
-            type="button"
-            disabled={actionsDisabled}
-            onClick={() => void handleCreateWorkspace()}
-          >
-            + Workspace
-          </button>
-        </div>
-      </header>
+        <header className="library-header">
+          <div className="brand-lockup">
+            <img className="brand-logo" src="/logo.svg" alt="" aria-hidden="true" />
+            <div>
+              <div className="eyebrow">Self-hosted Excalidraw</div>
+              <h1>Diagrams</h1>
+            </div>
+          </div>
+          <div className="library-header-actions">
+            <ThemeToggle />
+            <button
+              className="primary-button"
+              type="button"
+              disabled={actionsDisabled}
+              onClick={() => void handleCreateWorkspace()}
+            >
+              + Workspace
+            </button>
+          </div>
+        </header>
 
       {actionError ? (
         <div className="error-banner" role="alert">
