@@ -52,8 +52,8 @@ export async function updateEquation(
     excalidrawAPI,
     elementId,
   );
-  const previousRender = renderEquation(previousLatex);
-  const nextRender = renderEquation(latex);
+  const previousRender = renderEquation(previousLatex, element.strokeColor);
+  const nextRender = renderEquation(latex, element.strokeColor);
   const file = await createEquationFile(nextRender);
   const updatedElement = newElementWith(element, {
     fileId: file.id,

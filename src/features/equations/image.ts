@@ -16,6 +16,7 @@ export type EquationImage = {
 export async function createEquationImage(
   render: EquationRenderResult,
   position: { x: number; y: number },
+  color: string,
 ): Promise<EquationImage> {
   const file = await createEquationFile(render);
   const [element] = convertToExcalidrawElements(
@@ -27,6 +28,7 @@ export async function createEquationImage(
         y: position.y,
         width: render.width,
         height: render.height,
+        strokeColor: color,
         customData: {
           equation: createEquationData(render.latex),
         },

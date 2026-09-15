@@ -138,7 +138,8 @@ export default function EquationEditor({
       if (
         !(event.target instanceof Node) ||
         editorRef.current?.contains(event.target) ||
-        !(event.target instanceof HTMLCanvasElement)
+        !(event.target instanceof HTMLCanvasElement) ||
+        event.button !== 0
       ) {
         return;
       }
@@ -196,6 +197,11 @@ export default function EquationEditor({
       aria-labelledby="equation-dialog-title"
       aria-busy={isCommitting}
       style={{ left: `${screenPosition.x}px`, top: `${screenPosition.y}px` }}
+      onKeyDown={(event) => event.stopPropagation()}
+      onKeyUp={(event) => event.stopPropagation()}
+      onCopy={(event) => event.stopPropagation()}
+      onCut={(event) => event.stopPropagation()}
+      onPaste={(event) => event.stopPropagation()}
       onSubmit={(event) => void handleSubmit(event)}
     >
       <h2 id="equation-dialog-title">

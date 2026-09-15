@@ -8,12 +8,13 @@ export async function insertEquation(
   excalidrawAPI: ExcalidrawImperativeAPI,
   latex: string,
   scenePosition: EquationScenePosition,
+  color: string,
 ): Promise<void> {
-  const render = renderEquation(latex);
+  const render = renderEquation(latex, color);
   const image = await createEquationImage(render, {
     x: scenePosition.x,
     y: scenePosition.y,
-  });
+  }, color);
 
   excalidrawAPI.addFiles([image.file]);
   excalidrawAPI.updateScene({

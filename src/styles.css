@@ -592,11 +592,16 @@ button:not(:disabled):active {
   position: fixed;
   z-index: 20;
   width: min(680px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
   padding: 24px;
   color: var(--color-text);
+  color-scheme: inherit;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  outline: 2px solid var(--color-accent-border);
+  outline-offset: 3px;
   box-shadow: var(--shadow-card);
 }
 

@@ -864,6 +864,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       excalidrawAPI,
       latex,
       equationEditorSession.placement.scenePosition,
+      excalidrawAPI.getAppState().currentItemStrokeColor,
     );
   }
 

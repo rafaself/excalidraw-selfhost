@@ -98,7 +98,10 @@ function assertNoExternalAssets(svg: SVGElement) {
   }
 }
 
-function normalizeSvg(markup: string): Pick<EquationRenderResult, "svg" | "width" | "height"> {
+function normalizeSvg(
+  markup: string,
+  color: string,
+): Pick<EquationRenderResult, "svg" | "width" | "height"> {
   const parsed = new DOMParser().parseFromString(markup, "image/svg+xml");
 
   if (parsed.querySelector("parsererror")) {
@@ -131,16 +134,21 @@ function normalizeSvg(markup: string): Pick<EquationRenderResult, "svg" | "width
   svgElement.setAttribute("height", `${height}px`);
   svgElement.setAttribute("role", "img");
   svgElement.setAttribute("focusable", "false");
-  svgElement.setAttribute("color", "#1e1e1e");
+  svgElement.setAttribute("color", color);
 
   return { svg: svgElement.outerHTML, width, height };
 }
 
-export function renderEquation(latex: string): EquationRenderResult {
+export function renderEquation(latex: string, color: string): EquationRenderResult {
   const trimmedLatex = latex.trim();
+  const trimmedColor = color.trim();
 
   if (!trimmedLatex) {
     throw new Error("Enter an equation before inserting it.");
+  }
+
+  if (!trimmedColor) {
+    throw new Error("Equation color is unavailable.");
   }
 
   const { adaptor, document } = getRenderer();
@@ -150,7 +158,7 @@ export function renderEquation(latex: string): EquationRenderResult {
     ex: EQUATION_EX_SIZE,
     containerWidth: 80 * EQUATION_EM_SIZE,
   });
-  const normalized = normalizeSvg(adaptor.outerHTML(node));
+  const normalized = normalizeSvg(adaptor.outerHTML(node), trimmedColor);
 
   return { latex: trimmedLatex, ...normalized };
 }
