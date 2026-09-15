@@ -2,6 +2,7 @@ import {
   sceneCoordsToViewportCoords,
   viewportCoordsToSceneCoords,
 } from "@excalidraw/excalidraw";
+import type { ExcalidrawImageElement } from "@excalidraw/excalidraw/element/types";
 import type { AppState } from "@excalidraw/excalidraw/types";
 import type {
   EquationScenePosition,
@@ -49,4 +50,25 @@ export function isEquationCanvasClick(
   );
 
   return distanceInViewportPixels <= POINTER_CLICK_THRESHOLD_PX;
+}
+
+export function isScenePositionInsideEquation(
+  scenePosition: EquationScenePosition,
+  element: ExcalidrawImageElement,
+): boolean {
+  const centerX = element.x + element.width / 2;
+  const centerY = element.y + element.height / 2;
+  const deltaX = scenePosition.x - centerX;
+  const deltaY = scenePosition.y - centerY;
+  const cos = Math.cos(element.angle);
+  const sin = Math.sin(element.angle);
+  const localX = deltaX * cos + deltaY * sin + element.width / 2;
+  const localY = -deltaX * sin + deltaY * cos + element.height / 2;
+
+  return (
+    localX >= 0 &&
+    localX <= element.width &&
+    localY >= 0 &&
+    localY <= element.height
+  );
 }

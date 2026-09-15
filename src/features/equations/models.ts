@@ -1,3 +1,8 @@
+export type EquationData = {
+  version: 1;
+  latex: string;
+};
+
 export type EquationRenderResult = {
   latex: string;
   svg: string;

@@ -24,6 +24,7 @@ import {
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import {
   isEquationCanvasClick,
+  isScenePositionInsideEquation,
   scenePositionToViewportPosition,
   viewportPositionToScenePosition,
 } from "../equations/placement";
@@ -31,6 +32,7 @@ import type {
   EquationPlacement,
   EquationScenePosition,
 } from "../equations/models";
+import { getEquationData, isEquationElement } from "../equations/metadata";
 import { EQUATION_TOOL_TYPE, isEquationTool } from "../equations/tool";
 
 const AUTOSAVE_DELAY_MS = 1500;
@@ -62,6 +64,26 @@ type EditorPageProps = {
   workspaceId: string;
   diagramId: string;
 };
+
+type EquationEditorSession =
+  | {
+      mode: "create";
+      placement: EquationPlacement;
+    }
+  | {
+      mode: "edit";
+      elementId: string;
+      initialLatex: string;
+      placement: EquationPlacement;
+    };
+
+type ActiveTool = Parameters<ExcalidrawOnChange>[1]["activeTool"];
+
+function activeToolKey(activeTool: ActiveTool): string {
+  return activeTool.type === "custom"
+    ? `custom:${activeTool.customType}`
+    : activeTool.type;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong";
@@ -196,9 +218,9 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isEquationToolActive, setIsEquationToolActive] = useState(false);
-  const [equationPlacement, setEquationPlacement] = useState<EquationPlacement | null>(
-    null,
-  );
+  const [selectedEquationId, setSelectedEquationId] = useState<string | null>(null);
+  const [equationEditorSession, setEquationEditorSession] =
+    useState<EquationEditorSession | null>(null);
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
   const latestSceneRef = useRef<SceneSnapshot | null>(null);
@@ -215,6 +237,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     viewportPosition: { x: number; y: number };
   } | null>(null);
   const spaceHeldRef = useRef(false);
+  const activeToolKeyRef = useRef<string | null>(null);
 
   function clearAutosaveTimer() {
     if (debounceTimerRef.current !== null) {
@@ -319,29 +342,60 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
 
   const handleChange: ExcalidrawOnChange = (elements, appState, files) => {
     const equationToolSelected = isEquationTool(appState.activeTool);
+    const nextActiveToolKey = activeToolKey(appState.activeTool);
+    const activeToolChanged =
+      activeToolKeyRef.current !== null && activeToolKeyRef.current !== nextActiveToolKey;
+    activeToolKeyRef.current = nextActiveToolKey;
+
     setIsEquationToolActive((previous) =>
       previous === equationToolSelected ? previous : equationToolSelected,
     );
 
-    if (!equationToolSelected) {
+    const selectedIds = Object.keys(appState.selectedElementIds);
+    const selectedElement =
+      selectedIds.length === 1
+        ? elements.find((element) => element.id === selectedIds[0] && !element.isDeleted)
+        : undefined;
+    const selectedEquation = selectedElement && isEquationElement(selectedElement)
+      ? selectedElement
+      : undefined;
+    setSelectedEquationId((previous) =>
+      previous === selectedEquation?.id ? previous : selectedEquation?.id ?? null,
+    );
+
+    const editTargetAvailable =
+      equationEditorSession?.mode !== "edit" ||
+      elements.some(
+        (element) =>
+          element.id === equationEditorSession.elementId &&
+          !element.isDeleted &&
+          isEquationElement(element),
+      );
+
+    if (!editTargetAvailable) {
+      setEquationEditorSession(null);
+    } else if (equationEditorSession?.mode === "edit" && activeToolChanged) {
+      setEquationEditorSession(null);
+    } else if (equationEditorSession?.mode === "create" && !equationToolSelected) {
       equationPointerDownRef.current = null;
-      if (equationPlacement) {
-        setEquationPlacement(null);
-      }
-    } else if (equationPlacement) {
+      setEquationEditorSession(null);
+    } else if (equationEditorSession) {
       const viewportPosition = scenePositionToViewportPosition(
-        equationPlacement.scenePosition,
+        equationEditorSession.placement.scenePosition,
         appState,
       );
-      setEquationPlacement((currentPlacement) => {
-        if (!currentPlacement) {
-          return currentPlacement;
+      setEquationEditorSession((currentSession) => {
+        if (!currentSession) {
+          return currentSession;
         }
 
-        return currentPlacement.viewportPosition.x === viewportPosition.x &&
-          currentPlacement.viewportPosition.y === viewportPosition.y
-          ? currentPlacement
-          : { ...currentPlacement, viewportPosition };
+        return currentSession.placement.viewportPosition.x === viewportPosition.x &&
+          currentSession.placement.viewportPosition.y === viewportPosition.y
+          ? currentSession
+          : {
+              ...currentSession,
+              placement: { ...currentSession.placement, viewportPosition },
+            };
       });
     }
 
@@ -381,7 +435,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       excalidrawAPI !== null &&
       isEquationTool(excalidrawAPI.getAppState().activeTool);
 
-    setEquationPlacement(null);
+    setEquationEditorSession(null);
     setIsEquationToolActive(false);
 
     if (shouldResetTool) {
@@ -413,8 +467,10 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     setLoaded(null);
     setExcalidrawAPI(null);
     setIsEquationToolActive(false);
-    setEquationPlacement(null);
+    setSelectedEquationId(null);
+    setEquationEditorSession(null);
     equationPointerDownRef.current = null;
+    activeToolKeyRef.current = null;
     setLoadError(null);
     reportSaveState("saved");
 
@@ -494,7 +550,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
 
     const handlePointerDown = (event: PointerEvent) => {
       if (
-        equationPlacement ||
+        equationEditorSession ||
         spaceHeldRef.current ||
         event.button !== 0 ||
         !(event.target instanceof HTMLCanvasElement) ||
@@ -526,19 +582,22 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       equationPointerDownRef.current = null;
 
       if (
-        equationPlacement ||
+        equationEditorSession ||
         !isEquationCanvasClick(pointerDown.viewportPosition, event)
       ) {
         return;
       }
 
       const appState = excalidrawAPI.getAppState();
-      setEquationPlacement({
-        scenePosition: pointerDown.scenePosition,
-        viewportPosition: scenePositionToViewportPosition(
-          pointerDown.scenePosition,
-          appState,
-        ),
+      setEquationEditorSession({
+        mode: "create",
+        placement: {
+          scenePosition: pointerDown.scenePosition,
+          viewportPosition: scenePositionToViewportPosition(
+            pointerDown.scenePosition,
+            appState,
+          ),
+        },
       });
     };
 
@@ -558,7 +617,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       window.removeEventListener("pointercancel", handlePointerCancel, true);
       equationPointerDownRef.current = null;
     };
-  }, [excalidrawAPI, equationPlacement]);
+  }, [excalidrawAPI, equationEditorSession]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -587,22 +646,25 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   }, []);
 
   useEffect(() => {
-    if (!excalidrawAPI || !equationPlacement) {
+    if (!excalidrawAPI || !equationEditorSession) {
       return;
     }
 
     const updateEquationViewportPosition = () => {
-      setEquationPlacement((currentPlacement) => {
-        if (!currentPlacement) {
-          return currentPlacement;
+      setEquationEditorSession((currentSession) => {
+        if (!currentSession) {
+          return currentSession;
         }
 
         return {
-          ...currentPlacement,
-          viewportPosition: scenePositionToViewportPosition(
-            currentPlacement.scenePosition,
-            excalidrawAPI.getAppState(),
-          ),
+          ...currentSession,
+          placement: {
+            ...currentSession.placement,
+            viewportPosition: scenePositionToViewportPosition(
+              currentSession.placement.scenePosition,
+              excalidrawAPI.getAppState(),
+            ),
+          },
         };
       });
     };
@@ -616,34 +678,142 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     };
   }, [
     excalidrawAPI,
-    equationPlacement?.scenePosition.x,
-    equationPlacement?.scenePosition.y,
+    equationEditorSession?.placement.scenePosition.x,
+    equationEditorSession?.placement.scenePosition.y,
   ]);
 
   function handleScrollChange() {
-    setEquationPlacement((currentPlacement) => {
-      if (!currentPlacement || !excalidrawAPI) {
-        return currentPlacement;
+    setEquationEditorSession((currentSession) => {
+      if (!currentSession || !excalidrawAPI) {
+        return currentSession;
       }
 
       return {
-        ...currentPlacement,
-        viewportPosition: scenePositionToViewportPosition(
-          currentPlacement.scenePosition,
-          excalidrawAPI.getAppState(),
-        ),
+        ...currentSession,
+        placement: {
+          ...currentSession.placement,
+          viewportPosition: scenePositionToViewportPosition(
+            currentSession.placement.scenePosition,
+            excalidrawAPI.getAppState(),
+          ),
+        },
       };
     });
   }
+
+  function getSelectedEquation() {
+    if (!excalidrawAPI) {
+      return null;
+    }
+
+    const selectedIds = Object.keys(excalidrawAPI.getAppState().selectedElementIds);
+
+    if (selectedIds.length !== 1) {
+      return null;
+    }
+
+    const element = excalidrawAPI
+      .getSceneElements()
+      .find((candidate) => candidate.id === selectedIds[0]);
+
+    if (!element || !isEquationElement(element)) {
+      return null;
+    }
+
+    const data = getEquationData(element);
+
+    return data ? { element, data } : null;
+  }
+
+  function handleEquationEdit() {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    const selectedEquation = getSelectedEquation();
+
+    if (!selectedEquation) {
+      return;
+    }
+
+    const scenePosition = {
+      x: selectedEquation.element.x,
+      y: selectedEquation.element.y,
+    };
+
+    setEquationEditorSession({
+      mode: "edit",
+      elementId: selectedEquation.element.id,
+      initialLatex: selectedEquation.data.latex,
+      placement: {
+        scenePosition,
+        viewportPosition: scenePositionToViewportPosition(
+          scenePosition,
+          excalidrawAPI.getAppState(),
+        ),
+      },
+    });
+  }
+
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    const handleDoubleClick = (event: MouseEvent) => {
+      if (
+        equationEditorSession ||
+        event.button !== 0 ||
+        !(event.target instanceof HTMLCanvasElement)
+      ) {
+        return;
+      }
+
+      const appState = excalidrawAPI.getAppState();
+
+      if (appState.activeTool.type !== "selection") {
+        return;
+      }
+
+      const selectedEquation = getSelectedEquation();
+
+      if (!selectedEquation) {
+        return;
+      }
+
+      const scenePosition = viewportPositionToScenePosition(
+        { x: event.clientX, y: event.clientY },
+        appState,
+      );
+
+      if (!isScenePositionInsideEquation(scenePosition, selectedEquation.element)) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      handleEquationEdit();
+    };
+
+    document.addEventListener("dblclick", handleDoubleClick, true);
+
+    return () => {
+      document.removeEventListener("dblclick", handleDoubleClick, true);
+    };
+  }, [excalidrawAPI, equationEditorSession]);
 
   function handleEquationToolSelect() {
     if (!excalidrawAPI) {
       return;
     }
 
-    if (equationPlacement) {
+    if (equationEditorSession?.mode === "create") {
       closeEquationEditor(true);
       return;
+    }
+
+    if (equationEditorSession?.mode === "edit") {
+      closeEquationEditor(false);
     }
 
     if (isEquationTool(excalidrawAPI.getAppState().activeTool)) {
@@ -651,7 +821,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       return;
     }
 
-    setEquationPlacement(null);
+    setEquationEditorSession(null);
     setIsEquationToolActive(true);
     excalidrawAPI.setActiveTool({
       type: "custom",
@@ -679,12 +849,22 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   }
 
   async function handleEquationCommit(latex: string) {
-    if (!excalidrawAPI || !equationPlacement) {
+    if (!excalidrawAPI || !equationEditorSession) {
       throw new Error("The editor is not ready for equation insertion.");
     }
 
+    if (equationEditorSession.mode === "edit") {
+      const { updateEquation } = await import("../equations/update");
+      await updateEquation(excalidrawAPI, equationEditorSession.elementId, latex);
+      return;
+    }
+
     const { insertEquation } = await import("../equations/insert");
-    await insertEquation(excalidrawAPI, latex, equationPlacement.scenePosition);
+    await insertEquation(
+      excalidrawAPI,
+      latex,
+      equationEditorSession.placement.scenePosition,
+    );
   }
 
   const syncLabel =
@@ -767,6 +947,14 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
               >
                 Equation tool
               </MainMenu.Item>
+              {selectedEquationId ? (
+                <MainMenu.Item
+                  disabled={equationEditorSession !== null}
+                  onSelect={handleEquationEdit}
+                >
+                  Edit equation
+                </MainMenu.Item>
+              ) : null}
               <MainMenu.Separator />
               <MainMenu.Group title="Excalidraw links">
                 <MainMenu.DefaultItems.Socials />
@@ -798,15 +986,15 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           </Excalidraw>
         </div>
       )}
-      {equationPlacement ? (
+      {equationEditorSession ? (
         <Suspense
           fallback={
             <div
               className="equation-editor equation-editor-loading"
               role="status"
               style={{
-                left: `${equationPlacement.viewportPosition.x}px`,
-                top: `${equationPlacement.viewportPosition.y}px`,
+                left: `${equationEditorSession.placement.viewportPosition.x}px`,
+                top: `${equationEditorSession.placement.viewportPosition.y}px`,
               }}
             >
               Loading equation editor…
@@ -814,7 +1002,18 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           }
         >
           <LazyEquationEditor
-            viewportPosition={equationPlacement.viewportPosition}
+            key={
+              equationEditorSession.mode === "edit"
+                ? equationEditorSession.elementId
+                : "create"
+            }
+            initialLatex={
+              equationEditorSession.mode === "edit"
+                ? equationEditorSession.initialLatex
+                : ""
+            }
+            isExistingEquation={equationEditorSession.mode === "edit"}
+            viewportPosition={equationEditorSession.placement.viewportPosition}
             onCancel={() => closeEquationEditor(true)}
             onCommit={handleEquationCommit}
           />

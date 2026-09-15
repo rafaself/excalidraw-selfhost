@@ -11,6 +11,8 @@ import type { MathfieldElement } from "mathlive";
 import type { EquationViewportPosition } from "./models";
 
 type EquationEditorProps = {
+  initialLatex: string;
+  isExistingEquation: boolean;
   viewportPosition: EquationViewportPosition;
   onCancel: () => void;
   onCommit: (latex: string) => void | Promise<void>;
@@ -25,11 +27,13 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export default function EquationEditor({
+  initialLatex,
+  isExistingEquation,
   viewportPosition,
   onCancel,
   onCommit,
 }: EquationEditorProps) {
-  const [latex, setLatex] = useState("");
+  const [latex, setLatex] = useState(initialLatex);
   const [error, setError] = useState<string | null>(null);
   const [isCommitting, setIsCommitting] = useState(false);
   const [screenPosition, setScreenPosition] = useState(viewportPosition);
@@ -38,8 +42,16 @@ export default function EquationEditor({
   const isCommittingRef = useRef(false);
 
   useEffect(() => {
-    mathfieldRef.current?.focus();
-  }, []);
+    const mathfield = mathfieldRef.current;
+    setLatex(initialLatex);
+
+    if (!mathfield) {
+      return;
+    }
+
+    mathfield.value = initialLatex;
+    mathfield.focus();
+  }, [initialLatex]);
 
   useLayoutEffect(() => {
     const editor = editorRef.current;
@@ -96,7 +108,12 @@ export default function EquationEditor({
     event?.preventDefault();
 
     if (!latex.trim()) {
-      onCancel();
+      if (isExistingEquation) {
+        setError("An existing equation needs a LaTeX value.");
+        mathfieldRef.current?.focus();
+      } else {
+        onCancel();
+      }
       return;
     }
 
@@ -134,7 +151,12 @@ export default function EquationEditor({
       }
 
       if (!latex.trim()) {
-        onCancel();
+        if (isExistingEquation) {
+          setError("An existing equation needs a LaTeX value.");
+          mathfieldRef.current?.focus();
+        } else {
+          onCancel();
+        }
         return;
       }
 
@@ -146,7 +168,7 @@ export default function EquationEditor({
     return () => {
       document.removeEventListener("pointerdown", handleCanvasPointerDown, true);
     };
-  }, [latex, onCancel]);
+  }, [isExistingEquation, latex, onCancel]);
 
   function handleKeyDown(event: KeyboardEvent<MathfieldElement>) {
     event.stopPropagation();
@@ -176,7 +198,9 @@ export default function EquationEditor({
       style={{ left: `${screenPosition.x}px`, top: `${screenPosition.y}px` }}
       onSubmit={(event) => void handleSubmit(event)}
     >
-      <h2 id="equation-dialog-title">Insert equation</h2>
+      <h2 id="equation-dialog-title">
+        {isExistingEquation ? "Edit equation" : "Insert equation"}
+      </h2>
       <p className="equation-dialog-description">
         Type an equation with the keyboard or use MathLive’s structured input.
       </p>
@@ -190,7 +214,8 @@ export default function EquationEditor({
         {latex}
       </math-field>
       <p className="equation-dialog-hint">
-        Click the canvas to insert here, or use the button to commit.
+        Click the canvas to {isExistingEquation ? "save changes" : "insert here"}, or use
+        the button to commit.
       </p>
       {error ? (
         <p className="equation-dialog-error" role="alert">
@@ -207,7 +232,13 @@ export default function EquationEditor({
           Cancel
         </button>
         <button className="primary-button" type="submit" disabled={isCommitting}>
-          {isCommitting ? "Inserting…" : "Insert equation"}
+          {isCommitting
+            ? isExistingEquation
+              ? "Saving…"
+              : "Inserting…"
+            : isExistingEquation
+              ? "Save equation"
+              : "Insert equation"}
         </button>
       </div>
     </form>

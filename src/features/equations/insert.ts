@@ -17,7 +17,7 @@ export async function insertEquation(
 
   excalidrawAPI.addFiles([image.file]);
   excalidrawAPI.updateScene({
-    elements: [...excalidrawAPI.getSceneElements(), image.element],
+    elements: [...excalidrawAPI.getSceneElementsIncludingDeleted(), image.element],
     appState: {
       selectedElementIds: { [image.element.id]: true },
     },
