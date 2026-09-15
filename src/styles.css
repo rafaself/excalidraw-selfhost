@@ -588,6 +588,72 @@ button:not(:disabled):active {
   animation: editor-sync-spin 1s linear infinite;
 }
 
+.equation-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 58%);
+}
+
+.equation-dialog {
+  width: min(680px, 100%);
+  padding: 24px;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.equation-dialog h2 {
+  margin: 0 0 10px;
+  color: var(--color-text);
+  font-size: 1.2rem;
+}
+
+.equation-dialog-description,
+.equation-dialog-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.equation-dialog-description {
+  margin-bottom: 18px;
+}
+
+.equation-field {
+  display: block;
+  width: 100%;
+  min-height: 82px;
+  padding: 16px;
+  color: var(--color-text);
+  font-size: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.equation-field:focus {
+  border-color: var(--color-accent);
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.equation-dialog-hint {
+  margin-top: 10px;
+  font-size: 0.82rem;
+}
+
+.equation-dialog-error {
+  margin: 12px 0 0;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+}
+
 @keyframes editor-sync-spin {
   to {
     transform: rotate(360deg);
@@ -636,6 +702,14 @@ button:not(:disabled):active {
   .theme-toggle {
     width: 40px;
     padding: 8px;
+  }
+
+  .equation-dialog {
+    padding: 20px;
+  }
+
+  .equation-field {
+    font-size: 1.25rem;
   }
 }
 

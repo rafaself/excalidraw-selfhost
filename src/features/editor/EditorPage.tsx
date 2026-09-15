@@ -5,6 +5,8 @@ import {
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -18,8 +20,11 @@ import {
   type Diagram,
   type ExcalidrawDocument,
 } from "../../services/api";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 
 const AUTOSAVE_DELAY_MS = 1500;
+
+const LazyEquationEditor = lazy(() => import("../equations/EquationEditor"));
 
 type ExcalidrawOnChange = NonNullable<ComponentProps<typeof Excalidraw>["onChange"]>;
 
@@ -140,6 +145,21 @@ function ErrorIcon() {
   );
 }
 
+function EquationIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path
+        d="M5 7h14M5 17h14M8 7l4 10m4-10-4 10"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.5"
+      />
+    </svg>
+  );
+}
+
 function SyncStatusIcon({ saveState }: { saveState: SaveState }) {
   if (saveState === "saved") {
     return <CheckIcon />;
@@ -164,6 +184,8 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [isEquationEditorOpen, setIsEquationEditorOpen] = useState(false);
+  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
   const latestSceneRef = useRef<SceneSnapshot | null>(null);
   const lastPersistedSerializedRef = useRef<string | null>(null);
@@ -328,6 +350,8 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     savedRevisionRef.current = 0;
     hydratingRef.current = true;
     setLoaded(null);
+    setExcalidrawAPI(null);
+    setIsEquationEditorOpen(false);
     setLoadError(null);
     reportSaveState("saved");
 
@@ -418,6 +442,15 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     setLoadAttempt((attempt) => attempt + 1);
   }
 
+  async function handleEquationCommit(latex: string) {
+    if (!excalidrawAPI) {
+      throw new Error("The editor is not ready for equation insertion.");
+    }
+
+    const { insertEquation } = await import("../equations/insert");
+    await insertEquation(excalidrawAPI, latex);
+  }
+
   const syncLabel =
     saveState === "saved" ? "Synced" : saveState === "saving" ? "Syncing" : "Sync";
   const canSync = saveState === "pending" || saveState === "error";
@@ -445,6 +478,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
             name={loaded.diagram.name}
             theme={theme}
             onChange={handleChange}
+            excalidrawAPI={(api) => setExcalidrawAPI(api)}
             UIOptions={{
               canvasActions: {
                 loadScene: false,
@@ -470,6 +504,13 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
                 <MainMenu.DefaultItems.Help />
                 <MainMenu.DefaultItems.ClearCanvas />
               </MainMenu.Group>
+              <MainMenu.Separator />
+              <MainMenu.Item
+                icon={<EquationIcon />}
+                onSelect={() => setIsEquationEditorOpen(true)}
+              >
+                Insert equation
+              </MainMenu.Item>
               <MainMenu.Separator />
               <MainMenu.Group title="Excalidraw links">
                 <MainMenu.DefaultItems.Socials />
@@ -501,6 +542,22 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           </Excalidraw>
         </div>
       )}
+      {isEquationEditorOpen ? (
+        <Suspense
+          fallback={
+            <div className="equation-dialog-backdrop" role="status">
+              <div className="equation-dialog">
+                <p>Loading equation editor…</p>
+              </div>
+            </div>
+          }
+        >
+          <LazyEquationEditor
+            onCancel={() => setIsEquationEditorOpen(false)}
+            onCommit={handleEquationCommit}
+          />
+        </Suspense>
+      ) : null}
     </main>
   );
 }

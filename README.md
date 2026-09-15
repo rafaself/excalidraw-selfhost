@@ -14,6 +14,7 @@ Implemented:
 - workspace and diagram management UI backed by the R2 API
 - workspace-aware routes that preserve navigation context when opening the editor
 - persisted Excalidraw document loading and debounced autosave to R2
+- lazy-loaded MathLive equation authoring with local MathJax SVG insertion as ordinary Excalidraw images
 - visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
 - Terraform-managed Cloudflare Pages, R2, DNS, and Access infrastructure
 - Cloudflare edge API rate limiting and Pages security headers
@@ -149,6 +150,12 @@ Only one save loop can run at a time. If the scene changes during an in-flight r
 
 Navigating back through the application flushes pending changes first. Hiding the page triggers a best-effort flush, and the browser receives an unload warning while the editor still has potentially unsaved changes.
 
+## Equation insertion
+
+The editor’s main menu includes `Insert equation`. MathLive is loaded only when the equation dialog is opened, and its canonical LaTeX value remains in React state while the Excalidraw scene stays unchanged. Committing an equation validates the value, renders it locally through MathJax’s direct SVG API using only the `base` and `ams` TeX packages, and normalizes the result into a transparent, fixed-size SVG with an expression-local font path cache and no external assets.
+
+The SVG is added through Excalidraw’s public data-URL and element APIs as a regular image, selected at the viewport center, and then follows the existing `serializeAsJSON(..., "local")` autosave path. The first frontend build keeps the equation dependencies out of the initial application chunk; the MathLive authoring and MathJax rendering code is emitted in lazy chunk(s) and fetched on demand. In the current production build, those chunks are approximately 803 kB (220 kB gzip) for MathLive and 1.36 MB (486 kB gzip) for MathJax and insertion helpers. They remain deferred until the dialog is opened and an equation is committed.
+
 ## API
 
 All application persistence is same-origin under `/api`:
@@ -249,11 +256,14 @@ After Terraform bootstrap and any required infrastructure maintenance, revoke th
 ## Quality checks
 
 ```bash
+pnpm install --frozen-lockfile
 pnpm lint
 pnpm typecheck
 pnpm build
 pnpm test:api-limits
 ```
+
+The equation slice is intentionally covered by the existing frontend build and type checks rather than adding a test framework. Manual validation with `pnpm dev:pages` should cover structured fractions, roots, exponents, subscripts, integrals, symbols, cursor navigation, empty or invalid input, insertion failures, ordinary image insertion, autosave, reload, and restored equation images. `pnpm build` should continue to report the equation code as a lazy chunk separate from the initial application code.
 
 The typecheck command validates frontend code and Pages Functions separately so browser and Workers runtime globals do not conflict.
 
