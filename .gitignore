@@ -12,6 +12,7 @@ dist/
 
 # Generated Excalidraw assets
 public/excalidraw-assets/
+public/mathlive/
 
 # Cloudflare / Wrangler
 .wrangler/

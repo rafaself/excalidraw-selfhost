@@ -14,6 +14,7 @@ Implemented:
 - workspace and diagram management UI backed by the R2 API
 - workspace-aware routes that preserve navigation context when opening the editor
 - persisted Excalidraw document loading and debounced autosave to R2
+- canvas-positioned, lazy-loaded MathLive equation authoring with local MathJax SVG insertion as ordinary Excalidraw images
 - visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
 - Terraform-managed Cloudflare Pages, R2, DNS, and Access infrastructure
 - Cloudflare edge API rate limiting and Pages security headers
@@ -143,11 +144,45 @@ Each editor route is mounted as an identity-isolated instance. This prevents pen
 
 Opening a diagram loads its R2 document and restores it through Excalidraw before rendering the editor.
 
-Editor changes are serialized with Excalidraw's `serializeAsJSON(..., "local")` format, which keeps the editable scene data and referenced binary files while excluding transient runtime state. Autosave uses a 1.5 second debounce and only sends a `PUT` when the canonical serialized document differs from the last successful persistence.
+Editor changes are serialized with Excalidraw's `serializeAsJSON(..., "local")` format, which keeps the editable scene data, `customData.equation` metadata, and referenced binary files while excluding transient runtime state. Autosave uses a 1.5 second debounce and only sends a `PUT` when the canonical serialized document differs from the last successful persistence. Reloading restores the same serialized document through Excalidraw's `restore()` utility, so the equation source and SVG remain part of the ordinary diagram document stored in R2.
 
 Only one save loop can run at a time. If the scene changes during an in-flight request, the latest scene is persisted before the editor reports `Saved`. A failed request leaves the in-memory drawing untouched and exposes a `Retry` action.
 
 Navigating back through the application flushes pending changes first. Hiding the page triggers a best-effort flush, and the browser receives an unload warning while the editor still has potentially unsaved changes.
+
+## Equation authoring
+
+The editor exposes an `fx` Equation tool in Excalidraw’s public top-right UI slot and a matching main-menu action. Excalidraw 0.18.1 does not expose public registration for placing custom tools in its native shape toolbar, so the stable top-right extension slot is used instead of coupling to internal DOM structure. Selecting the tool clears the previous tool’s transient state; clicking the canvas captures the click as a scene coordinate and opens a floating MathLive editor at that location.
+
+MathLive’s canonical LaTeX value remains in React state while the Excalidraw scene stays unchanged. Panning, zooming, page scrolling, and viewport resizing recompute the overlay position from the captured scene coordinate. Clicking elsewhere on the canvas commits a non-empty equation; `Escape` or Cancel exits without creating an element; `Ctrl/Cmd + Enter` and the explicit Insert action also commit. Switching Excalidraw tools closes the transient editor and leaves the selected tool active. While the field or its controls are active, keyboard, clipboard, and undo/redo events remain scoped to MathLive; plain `Enter` is left to MathLive, while `Ctrl/Cmd + Enter` commits explicitly. Primary canvas clicks commit, while non-primary pointer gestures remain available for normal canvas interaction.
+
+Created equations also persist `customData.equation` as the versioned `{ version: 1, latex }` source of truth. An image is editable only when that metadata passes validation; ordinary images and malformed or unsupported equation metadata remain ordinary Excalidraw images. Double-click a selected equation, or choose `Edit equation` from the main menu, to reopen its exact stored LaTeX in MathLive. Because Excalidraw 0.18.1 does not expose a public double-click prop, the editor listens to the canvas event through a stable browser capture listener and uses only public scene data and coordinate helpers.
+
+On creation, the equation is rendered locally through MathJax’s direct SVG API using only the `base` and `ams` TeX packages, then normalized into a transparent, fixed-size SVG with an expression-local font path cache and no external assets. The current Excalidraw foreground/stroke color is applied to the SVG and retained in the image’s normal `strokeColor` property for regeneration; theme changes do not regenerate equation assets, and no separate equation color picker is introduced. On edit, the same logical element keeps its identity, scene position, rotation, image flip, and user-applied scale while receiving a new file ID, natural dimensions adjusted by the prior visual scale, and updated metadata. The SVG is added through Excalidraw’s public data-URL and element APIs and persisted through the existing `serializeAsJSON(..., "local")` autosave path. Rendering or file conversion failures leave the original element and metadata unchanged; empty existing equations remain in edit mode with validation feedback. Updates use Excalidraw’s immediate capture path so normal undo/redo restores matching metadata and rendered files.
+
+After initialization, the editor checks only validated equation images for absent or unusable SVG files. Missing assets are regenerated from their stored LaTeX, registered with Excalidraw, and attached to the existing element in one recovery update. Healthy files are not rendered again, ordinary images are ignored, and recovery is capped at 32 equations per load with no retry loop. A failed or over-limit recovery leaves the rest of the scene usable and shows a controlled recovery message; the stored metadata remains available for a later edit attempt.
+
+Equations remain ordinary Excalidraw image elements, so the existing PNG, SVG, Save as image, copy/duplicate, and undo/redo flows operate on the same self-contained SVG file. The normalized SVG has no external font or cache references, and exports do not require the MathLive editor to be mounted. Duplicated equations may share an immutable file until one is edited; an edit always creates a new file for that element, preserving independent source and asset state.
+
+The first frontend build keeps the equation dependencies out of the initial application chunk; the MathLive authoring and MathJax rendering code is emitted in lazy chunk(s) and fetched on demand. In the current production build, those chunks are approximately 803 kB (220 kB gzip) for MathLive and 1.36 MB (486 kB gzip) for MathJax and insertion helpers.
+
+Equation maintenance follows a single browser-to-document path:
+
+```text
+MathLive value
+      ↓ canonical LaTeX in React state
+MathJax base + ams
+      ↓ normalized self-contained SVG
+Excalidraw image file + { version: 1, latex } metadata
+      ↓ existing local JSON autosave
+R2 document.excalidraw
+```
+
+The editor never stores the live MathLive DOM or runtime app state. The versioned metadata is the only signal that an image is an editable equation; ordinary images and malformed metadata are deliberately ignored. The normalized SVG rejects embedded HTML, external URLs, and non-local asset references, so rendering is local and the saved image is self-contained. Equation edits update the image file reference and source metadata together through the existing Excalidraw scene update, while the R2 API and autosave implementation remain unchanged. MathLive's KaTeX fonts and keyboard sounds are copied into the generated `public/mathlive/` tree during install and served from same-origin `/mathlive/` paths.
+
+MathLive (`0.110.0`) is MIT-licensed and MathJax (`@mathjax/src` `4.1.3`) is Apache-2.0-licensed. The equation test tooling is development-only: Vitest (`4.1.11`) and happy-dom (`20.14.5`) are MIT-licensed and are not included in production bundles. Dependency versions and integrity data are committed in `pnpm-lock.yaml`; no equation service, remote renderer, credential, or backend persistence dependency is introduced.
+
+The release review also runs `pnpm audit --prod`. On the current dependency graph it reports 11 moderate/high advisories in pre-existing transitive Excalidraw dependencies (`lodash-es` through Mermaid and several `nanoid` versions); it reports no issue caused by MathLive or MathJax. Those packages are owned by the current Excalidraw release and are not overridden here: forcing incompatible major versions would be less safe than retaining the vendor-supported graph. They should be revisited before broad public exposure of the deployment, independently of the equation slice.
 
 ## API
 
@@ -199,6 +234,7 @@ Two GitHub Actions workflows keep validation and production credentials separate
 
 ```text
 pull request → pnpm install --frozen-lockfile → lint → typecheck → build
+              → focused equation tests → API request-limit tests
 main         → pnpm install --frozen-lockfile → lint → typecheck → build → Wrangler Pages deploy
 ```
 
@@ -249,11 +285,15 @@ After Terraform bootstrap and any required infrastructure maintenance, revoke th
 ## Quality checks
 
 ```bash
+pnpm install --frozen-lockfile
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm test:equations
 pnpm test:api-limits
 ```
+
+`test:equations` runs the focused Vitest suite for metadata validation, SVG asset checks, placement boundaries, scaled updates, MathJax output, and bounded recovery failures. The suite uses only equation-owned modules and mocks the Excalidraw imperative boundary where the full browser runtime cannot be loaded in Node. The running application remains the integration check for Excalidraw's public serialization and restore path: manual validation with `pnpm dev:pages` should cover structured fractions, roots, exponents, subscripts, integrals, symbols, cursor navigation, empty or invalid input, insertion failures, ordinary image insertion, duplicate/edit independence, undo/redo, PNG/SVG/Save as image exports, autosave, reload, and restored equation images. A controlled fixture with valid equation metadata and a removed referenced file should regenerate once on load and persist healthy after the next save. `pnpm build` should continue to report the equation code as lazy chunks separate from the initial application code.
 
 The typecheck command validates frontend code and Pages Functions separately so browser and Workers runtime globals do not conflict.
 
