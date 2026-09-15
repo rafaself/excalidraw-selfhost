@@ -379,9 +379,6 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       setEquationEditorSession(null);
     } else if (equationEditorSession?.mode === "edit" && activeToolChanged) {
       setEquationEditorSession(null);
-    } else if (equationEditorSession?.mode === "create" && !equationToolSelected) {
-      equationPointerDownRef.current = null;
-      setEquationEditorSession(null);
     } else if (equationEditorSession) {
       const viewportPosition = scenePositionToViewportPosition(
         equationEditorSession.placement.scenePosition,
@@ -652,6 +649,9 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
         return;
       }
 
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
       const viewportPosition = { x: event.clientX, y: event.clientY };
       const scenePosition = viewportPositionToScenePosition(
         viewportPosition,
@@ -672,6 +672,8 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
         return;
       }
 
+      event.preventDefault();
+      event.stopImmediatePropagation();
       equationPointerDownRef.current = null;
 
       if (
@@ -700,12 +702,12 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       }
     };
 
-    document.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("pointerdown", handlePointerDown, true);
     window.addEventListener("pointerup", handlePointerUp, true);
     window.addEventListener("pointercancel", handlePointerCancel, true);
 
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("pointerup", handlePointerUp, true);
       window.removeEventListener("pointercancel", handlePointerCancel, true);
       equationPointerDownRef.current = null;
