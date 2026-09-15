@@ -4,3 +4,18 @@ export type EquationRenderResult = {
   width: number;
   height: number;
 };
+
+export type EquationScenePosition = {
+  x: number;
+  y: number;
+};
+
+export type EquationViewportPosition = {
+  x: number;
+  y: number;
+};
+
+export type EquationPlacement = {
+  scenePosition: EquationScenePosition;
+  viewportPosition: EquationViewportPosition;
+};

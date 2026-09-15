@@ -1,27 +1,18 @@
-import {
-  CaptureUpdateAction,
-  viewportCoordsToSceneCoords,
-} from "@excalidraw/excalidraw";
+import { CaptureUpdateAction } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import { createEquationImage } from "./image";
+import type { EquationScenePosition } from "./models";
 import { renderEquation } from "./renderer";
 
 export async function insertEquation(
   excalidrawAPI: ExcalidrawImperativeAPI,
   latex: string,
+  scenePosition: EquationScenePosition,
 ): Promise<void> {
   const render = renderEquation(latex);
-  const appState = excalidrawAPI.getAppState();
-  const viewportCenter = viewportCoordsToSceneCoords(
-    {
-      clientX: appState.offsetLeft + appState.width / 2,
-      clientY: appState.offsetTop + appState.height / 2,
-    },
-    appState,
-  );
   const image = await createEquationImage(render, {
-    x: viewportCenter.x - render.width / 2,
-    y: viewportCenter.y - render.height / 2,
+    x: scenePosition.x,
+    y: scenePosition.y,
   });
 
   excalidrawAPI.addFiles([image.file]);

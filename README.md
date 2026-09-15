@@ -14,7 +14,7 @@ Implemented:
 - workspace and diagram management UI backed by the R2 API
 - workspace-aware routes that preserve navigation context when opening the editor
 - persisted Excalidraw document loading and debounced autosave to R2
-- lazy-loaded MathLive equation authoring with local MathJax SVG insertion as ordinary Excalidraw images
+- canvas-positioned, lazy-loaded MathLive equation authoring with local MathJax SVG insertion as ordinary Excalidraw images
 - visible `Saving…`, `Saved`, and `Save failed` editor states with manual retry
 - Terraform-managed Cloudflare Pages, R2, DNS, and Access infrastructure
 - Cloudflare edge API rate limiting and Pages security headers
@@ -152,9 +152,11 @@ Navigating back through the application flushes pending changes first. Hiding th
 
 ## Equation insertion
 
-The editor’s main menu includes `Insert equation`. MathLive is loaded only when the equation dialog is opened, and its canonical LaTeX value remains in React state while the Excalidraw scene stays unchanged. Committing an equation validates the value, renders it locally through MathJax’s direct SVG API using only the `base` and `ams` TeX packages, and normalizes the result into a transparent, fixed-size SVG with an expression-local font path cache and no external assets.
+The editor exposes an `fx` Equation tool in Excalidraw’s public top-right UI slot and a matching main-menu action. Excalidraw 0.18.1 does not expose public registration for placing custom tools in its native shape toolbar, so the stable top-right extension slot is used instead of coupling to internal DOM structure. Selecting the tool clears the previous tool’s transient state; clicking the canvas captures the click as a scene coordinate and opens a floating MathLive editor at that location.
 
-The SVG is added through Excalidraw’s public data-URL and element APIs as a regular image, selected at the viewport center, and then follows the existing `serializeAsJSON(..., "local")` autosave path. The first frontend build keeps the equation dependencies out of the initial application chunk; the MathLive authoring and MathJax rendering code is emitted in lazy chunk(s) and fetched on demand. In the current production build, those chunks are approximately 803 kB (220 kB gzip) for MathLive and 1.36 MB (486 kB gzip) for MathJax and insertion helpers. They remain deferred until the dialog is opened and an equation is committed.
+MathLive’s canonical LaTeX value remains in React state while the Excalidraw scene stays unchanged. Panning, zooming, page scrolling, and viewport resizing recompute the overlay position from the captured scene coordinate. Clicking elsewhere on the canvas commits a non-empty equation; `Escape` or Cancel exits without creating an element; `Ctrl/Cmd + Enter` and the explicit Insert action also commit. Switching Excalidraw tools closes the transient editor and leaves the selected tool active.
+
+On commit, the equation is rendered locally through MathJax’s direct SVG API using only the `base` and `ams` TeX packages, then normalized into a transparent, fixed-size SVG with an expression-local font path cache and no external assets. The SVG is added through Excalidraw’s public data-URL and element APIs as a regular image at the captured scene position (the click is its stable top-left anchor), selected, and persisted through the existing `serializeAsJSON(..., "local")` autosave path. The first frontend build keeps the equation dependencies out of the initial application chunk; the MathLive authoring and MathJax rendering code is emitted in lazy chunk(s) and fetched on demand. In the current production build, those chunks are approximately 803 kB (220 kB gzip) for MathLive and 1.36 MB (486 kB gzip) for MathJax and insertion helpers.
 
 ## API
 

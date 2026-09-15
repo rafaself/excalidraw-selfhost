@@ -1,4 +1,5 @@
 import {
+  Button,
   Excalidraw,
   MainMenu,
   restore,
@@ -21,6 +22,16 @@ import {
   type ExcalidrawDocument,
 } from "../../services/api";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import {
+  isEquationCanvasClick,
+  scenePositionToViewportPosition,
+  viewportPositionToScenePosition,
+} from "../equations/placement";
+import type {
+  EquationPlacement,
+  EquationScenePosition,
+} from "../equations/models";
+import { EQUATION_TOOL_TYPE, isEquationTool } from "../equations/tool";
 
 const AUTOSAVE_DELAY_MS = 1500;
 
@@ -184,7 +195,10 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   const [saveState, setSaveState] = useState<SaveState>("saved");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [isEquationEditorOpen, setIsEquationEditorOpen] = useState(false);
+  const [isEquationToolActive, setIsEquationToolActive] = useState(false);
+  const [equationPlacement, setEquationPlacement] = useState<EquationPlacement | null>(
+    null,
+  );
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
   const latestSceneRef = useRef<SceneSnapshot | null>(null);
@@ -195,6 +209,12 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   const debounceTimerRef = useRef<number | null>(null);
   const saveLoopPromiseRef = useRef<Promise<boolean> | null>(null);
   const mountedRef = useRef(true);
+  const equationPointerDownRef = useRef<{
+    pointerId: number;
+    scenePosition: EquationScenePosition;
+    viewportPosition: { x: number; y: number };
+  } | null>(null);
+  const spaceHeldRef = useRef(false);
 
   function clearAutosaveTimer() {
     if (debounceTimerRef.current !== null) {
@@ -298,6 +318,33 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   }
 
   const handleChange: ExcalidrawOnChange = (elements, appState, files) => {
+    const equationToolSelected = isEquationTool(appState.activeTool);
+    setIsEquationToolActive((previous) =>
+      previous === equationToolSelected ? previous : equationToolSelected,
+    );
+
+    if (!equationToolSelected) {
+      equationPointerDownRef.current = null;
+      if (equationPlacement) {
+        setEquationPlacement(null);
+      }
+    } else if (equationPlacement) {
+      const viewportPosition = scenePositionToViewportPosition(
+        equationPlacement.scenePosition,
+        appState,
+      );
+      setEquationPlacement((currentPlacement) => {
+        if (!currentPlacement) {
+          return currentPlacement;
+        }
+
+        return currentPlacement.viewportPosition.x === viewportPosition.x &&
+          currentPlacement.viewportPosition.y === viewportPosition.y
+          ? currentPlacement
+          : { ...currentPlacement, viewportPosition };
+      });
+    }
+
     if (
       (appState.theme === "light" || appState.theme === "dark") &&
       appState.theme !== theme
@@ -328,6 +375,20 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     scheduleAutosave();
   };
 
+  function closeEquationEditor(resetTool: boolean) {
+    const shouldResetTool =
+      resetTool &&
+      excalidrawAPI !== null &&
+      isEquationTool(excalidrawAPI.getAppState().activeTool);
+
+    setEquationPlacement(null);
+    setIsEquationToolActive(false);
+
+    if (shouldResetTool) {
+      excalidrawAPI.setActiveTool({ type: "selection" });
+    }
+  }
+
   useEffect(() => {
     mountedRef.current = true;
 
@@ -351,7 +412,9 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     hydratingRef.current = true;
     setLoaded(null);
     setExcalidrawAPI(null);
-    setIsEquationEditorOpen(false);
+    setIsEquationToolActive(false);
+    setEquationPlacement(null);
+    equationPointerDownRef.current = null;
     setLoadError(null);
     reportSaveState("saved");
 
@@ -424,7 +487,180 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        equationPlacement ||
+        spaceHeldRef.current ||
+        event.button !== 0 ||
+        !(event.target instanceof HTMLCanvasElement) ||
+        !isEquationTool(excalidrawAPI.getAppState().activeTool)
+      ) {
+        return;
+      }
+
+      const viewportPosition = { x: event.clientX, y: event.clientY };
+      const scenePosition = viewportPositionToScenePosition(
+        viewportPosition,
+        excalidrawAPI.getAppState(),
+      );
+
+      equationPointerDownRef.current = {
+        pointerId: event.pointerId,
+        scenePosition,
+        viewportPosition,
+      };
+    };
+
+    const handlePointerUp = (event: PointerEvent) => {
+      const pointerDown = equationPointerDownRef.current;
+
+      if (!pointerDown || pointerDown.pointerId !== event.pointerId) {
+        return;
+      }
+
+      equationPointerDownRef.current = null;
+
+      if (
+        equationPlacement ||
+        !isEquationCanvasClick(pointerDown.viewportPosition, event)
+      ) {
+        return;
+      }
+
+      const appState = excalidrawAPI.getAppState();
+      setEquationPlacement({
+        scenePosition: pointerDown.scenePosition,
+        viewportPosition: scenePositionToViewportPosition(
+          pointerDown.scenePosition,
+          appState,
+        ),
+      });
+    };
+
+    const handlePointerCancel = (event: PointerEvent) => {
+      if (equationPointerDownRef.current?.pointerId === event.pointerId) {
+        equationPointerDownRef.current = null;
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("pointerup", handlePointerUp, true);
+    window.addEventListener("pointercancel", handlePointerCancel, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("pointerup", handlePointerUp, true);
+      window.removeEventListener("pointercancel", handlePointerCancel, true);
+      equationPointerDownRef.current = null;
+    };
+  }, [excalidrawAPI, equationPlacement]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        spaceHeldRef.current = true;
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        spaceHeldRef.current = false;
+      }
+    };
+    const handleWindowBlur = () => {
+      spaceHeldRef.current = false;
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    window.addEventListener("blur", handleWindowBlur);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+      window.removeEventListener("blur", handleWindowBlur);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!excalidrawAPI || !equationPlacement) {
+      return;
+    }
+
+    const updateEquationViewportPosition = () => {
+      setEquationPlacement((currentPlacement) => {
+        if (!currentPlacement) {
+          return currentPlacement;
+        }
+
+        return {
+          ...currentPlacement,
+          viewportPosition: scenePositionToViewportPosition(
+            currentPlacement.scenePosition,
+            excalidrawAPI.getAppState(),
+          ),
+        };
+      });
+    };
+
+    window.addEventListener("resize", updateEquationViewportPosition);
+    window.addEventListener("scroll", updateEquationViewportPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updateEquationViewportPosition);
+      window.removeEventListener("scroll", updateEquationViewportPosition, true);
+    };
+  }, [
+    excalidrawAPI,
+    equationPlacement?.scenePosition.x,
+    equationPlacement?.scenePosition.y,
+  ]);
+
+  function handleScrollChange() {
+    setEquationPlacement((currentPlacement) => {
+      if (!currentPlacement || !excalidrawAPI) {
+        return currentPlacement;
+      }
+
+      return {
+        ...currentPlacement,
+        viewportPosition: scenePositionToViewportPosition(
+          currentPlacement.scenePosition,
+          excalidrawAPI.getAppState(),
+        ),
+      };
+    });
+  }
+
+  function handleEquationToolSelect() {
+    if (!excalidrawAPI) {
+      return;
+    }
+
+    if (equationPlacement) {
+      closeEquationEditor(true);
+      return;
+    }
+
+    if (isEquationTool(excalidrawAPI.getAppState().activeTool)) {
+      closeEquationEditor(true);
+      return;
+    }
+
+    setEquationPlacement(null);
+    setIsEquationToolActive(true);
+    excalidrawAPI.setActiveTool({
+      type: "custom",
+      customType: EQUATION_TOOL_TYPE,
+    });
+  }
+
   async function handleHome() {
+    closeEquationEditor(true);
     setIsLeaving(true);
     const saved = await flushPendingSave();
 
@@ -443,12 +679,12 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   }
 
   async function handleEquationCommit(latex: string) {
-    if (!excalidrawAPI) {
+    if (!excalidrawAPI || !equationPlacement) {
       throw new Error("The editor is not ready for equation insertion.");
     }
 
     const { insertEquation } = await import("../equations/insert");
-    await insertEquation(excalidrawAPI, latex);
+    await insertEquation(excalidrawAPI, latex, equationPlacement.scenePosition);
   }
 
   const syncLabel =
@@ -479,6 +715,24 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
             theme={theme}
             onChange={handleChange}
             excalidrawAPI={(api) => setExcalidrawAPI(api)}
+            onScrollChange={handleScrollChange}
+            renderTopRightUI={(_isMobile, appState) => {
+              const selected = isEquationTool(appState.activeTool);
+
+              return (
+                <Button
+                  className="equation-tool-button"
+                  disabled={!excalidrawAPI}
+                  onSelect={handleEquationToolSelect}
+                  selected={selected}
+                  aria-label="Equation tool"
+                  aria-pressed={selected}
+                  title="Equation tool"
+                >
+                  <span aria-hidden="true">fx</span>
+                </Button>
+              );
+            }}
             UIOptions={{
               canvasActions: {
                 loadScene: false,
@@ -507,9 +761,11 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
               <MainMenu.Separator />
               <MainMenu.Item
                 icon={<EquationIcon />}
-                onSelect={() => setIsEquationEditorOpen(true)}
+                disabled={!excalidrawAPI}
+                selected={isEquationToolActive}
+                onSelect={handleEquationToolSelect}
               >
-                Insert equation
+                Equation tool
               </MainMenu.Item>
               <MainMenu.Separator />
               <MainMenu.Group title="Excalidraw links">
@@ -542,18 +798,24 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
           </Excalidraw>
         </div>
       )}
-      {isEquationEditorOpen ? (
+      {equationPlacement ? (
         <Suspense
           fallback={
-            <div className="equation-dialog-backdrop" role="status">
-              <div className="equation-dialog">
-                <p>Loading equation editor…</p>
-              </div>
+            <div
+              className="equation-editor equation-editor-loading"
+              role="status"
+              style={{
+                left: `${equationPlacement.viewportPosition.x}px`,
+                top: `${equationPlacement.viewportPosition.y}px`,
+              }}
+            >
+              Loading equation editor…
             </div>
           }
         >
           <LazyEquationEditor
-            onCancel={() => setIsEquationEditorOpen(false)}
+            viewportPosition={equationPlacement.viewportPosition}
+            onCancel={() => closeEquationEditor(true)}
             onCommit={handleEquationCommit}
           />
         </Suspense>

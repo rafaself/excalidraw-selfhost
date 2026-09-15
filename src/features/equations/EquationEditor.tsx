@@ -1,8 +1,17 @@
 import "mathlive";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import type { MathfieldElement } from "mathlive";
+import type { EquationViewportPosition } from "./models";
 
 type EquationEditorProps = {
+  viewportPosition: EquationViewportPosition;
   onCancel: () => void;
   onCommit: (latex: string) => void | Promise<void>;
 };
@@ -11,15 +20,72 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Could not insert equation.";
 }
 
-export default function EquationEditor({ onCancel, onCommit }: EquationEditorProps) {
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), Math.max(min, max));
+}
+
+export default function EquationEditor({
+  viewportPosition,
+  onCancel,
+  onCommit,
+}: EquationEditorProps) {
   const [latex, setLatex] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isCommitting, setIsCommitting] = useState(false);
+  const [screenPosition, setScreenPosition] = useState(viewportPosition);
+  const editorRef = useRef<HTMLFormElement | null>(null);
   const mathfieldRef = useRef<MathfieldElement | null>(null);
+  const isCommittingRef = useRef(false);
 
   useEffect(() => {
     mathfieldRef.current?.focus();
   }, []);
+
+  useLayoutEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    const reposition = () => {
+      const margin = 12;
+      const nextPosition = {
+        x: clamp(
+          viewportPosition.x,
+          margin,
+          window.innerWidth - editor.offsetWidth - margin,
+        ),
+        y: clamp(
+          viewportPosition.y,
+          margin,
+          window.innerHeight - editor.offsetHeight - margin,
+        ),
+      };
+
+      setScreenPosition((previousPosition) =>
+        previousPosition.x === nextPosition.x && previousPosition.y === nextPosition.y
+          ? previousPosition
+          : nextPosition,
+      );
+    };
+
+    reposition();
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(reposition);
+    resizeObserver?.observe(editor);
+
+    return () => {
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+      resizeObserver?.disconnect();
+    };
+  }, [error, viewportPosition.x, viewportPosition.y]);
 
   function handleInput(event: FormEvent<MathfieldElement>) {
     setLatex(event.currentTarget.value);
@@ -30,12 +96,12 @@ export default function EquationEditor({ onCancel, onCommit }: EquationEditorPro
     event?.preventDefault();
 
     if (!latex.trim()) {
-      setError("Enter an equation before inserting it.");
-      mathfieldRef.current?.focus();
+      onCancel();
       return;
     }
 
     setIsCommitting(true);
+    isCommittingRef.current = true;
     setError(null);
 
     try {
@@ -45,9 +111,42 @@ export default function EquationEditor({ onCancel, onCommit }: EquationEditorPro
       setError(errorMessage(commitError));
       mathfieldRef.current?.focus();
     } finally {
+      isCommittingRef.current = false;
       setIsCommitting(false);
     }
   }
+
+  useEffect(() => {
+    const handleCanvasPointerDown = (event: PointerEvent) => {
+      if (
+        !(event.target instanceof Node) ||
+        editorRef.current?.contains(event.target) ||
+        !(event.target instanceof HTMLCanvasElement)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (isCommittingRef.current) {
+        return;
+      }
+
+      if (!latex.trim()) {
+        onCancel();
+        return;
+      }
+
+      void handleSubmit();
+    };
+
+    document.addEventListener("pointerdown", handleCanvasPointerDown, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleCanvasPointerDown, true);
+    };
+  }, [latex, onCancel]);
 
   function handleKeyDown(event: KeyboardEvent<MathfieldElement>) {
     event.stopPropagation();
@@ -67,59 +166,50 @@ export default function EquationEditor({ onCancel, onCommit }: EquationEditorPro
   }
 
   return (
-    <div
-      className="equation-dialog-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isCommitting) {
-          onCancel();
-        }
-      }}
+    <form
+      ref={editorRef}
+      className="equation-editor"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="equation-dialog-title"
+      aria-busy={isCommitting}
+      style={{ left: `${screenPosition.x}px`, top: `${screenPosition.y}px` }}
+      onSubmit={(event) => void handleSubmit(event)}
     >
-      <form
-        className="equation-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="equation-dialog-title"
-        aria-busy={isCommitting}
-        onSubmit={(event) => void handleSubmit(event)}
-        onMouseDown={(event) => event.stopPropagation()}
+      <h2 id="equation-dialog-title">Insert equation</h2>
+      <p className="equation-dialog-description">
+        Type an equation with the keyboard or use MathLive’s structured input.
+      </p>
+      <math-field
+        ref={mathfieldRef}
+        className="equation-field"
+        aria-label="Equation in LaTeX"
+        onInput={handleInput}
+        onKeyDown={handleKeyDown}
       >
-        <h2 id="equation-dialog-title">Insert equation</h2>
-        <p className="equation-dialog-description">
-          Type an equation with the keyboard or use MathLive’s structured input.
+        {latex}
+      </math-field>
+      <p className="equation-dialog-hint">
+        Click the canvas to insert here, or use the button to commit.
+      </p>
+      {error ? (
+        <p className="equation-dialog-error" role="alert">
+          {error}
         </p>
-        <math-field
-          ref={mathfieldRef}
-          className="equation-field"
-          aria-label="Equation in LaTeX"
-          onInput={handleInput}
-          onKeyDown={handleKeyDown}
+      ) : null}
+      <div className="dialog-actions">
+        <button
+          className="secondary-button"
+          type="button"
+          disabled={isCommitting}
+          onClick={onCancel}
         >
-          {latex}
-        </math-field>
-        <p className="equation-dialog-hint">
-          The captured LaTeX is rendered locally as a sharp SVG image.
-        </p>
-        {error ? (
-          <p className="equation-dialog-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-        <div className="dialog-actions">
-          <button
-            className="secondary-button"
-            type="button"
-            disabled={isCommitting}
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button className="primary-button" type="submit" disabled={isCommitting}>
-            {isCommitting ? "Inserting…" : "Insert equation"}
-          </button>
-        </div>
-      </form>
-    </div>
+          Cancel
+        </button>
+        <button className="primary-button" type="submit" disabled={isCommitting}>
+          {isCommitting ? "Inserting…" : "Insert equation"}
+        </button>
+      </div>
+    </form>
   );
 }

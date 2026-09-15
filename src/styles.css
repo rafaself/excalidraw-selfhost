@@ -588,18 +588,10 @@ button:not(:disabled):active {
   animation: editor-sync-spin 1s linear infinite;
 }
 
-.equation-dialog-backdrop {
+.equation-editor {
   position: fixed;
-  inset: 0;
   z-index: 20;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgb(15 23 42 / 58%);
-}
-
-.equation-dialog {
-  width: min(680px, 100%);
+  width: min(680px, calc(100vw - 24px));
   padding: 24px;
   color: var(--color-text);
   background: var(--color-surface-raised);
@@ -608,20 +600,24 @@ button:not(:disabled):active {
   box-shadow: var(--shadow-card);
 }
 
-.equation-dialog h2 {
+.equation-editor-loading {
+  pointer-events: none;
+}
+
+.equation-editor h2 {
   margin: 0 0 10px;
   color: var(--color-text);
   font-size: 1.2rem;
 }
 
-.equation-dialog-description,
-.equation-dialog-hint {
+.equation-editor .equation-dialog-description,
+.equation-editor .equation-dialog-hint {
   margin: 0;
   color: var(--color-text-muted);
   line-height: 1.5;
 }
 
-.equation-dialog-description {
+.equation-editor .equation-dialog-description {
   margin-bottom: 18px;
 }
 
@@ -643,15 +639,27 @@ button:not(:disabled):active {
   outline-offset: 2px;
 }
 
-.equation-dialog-hint {
+.equation-editor .equation-dialog-hint {
   margin-top: 10px;
   font-size: 0.82rem;
 }
 
-.equation-dialog-error {
+.equation-editor .equation-dialog-error {
   margin: 12px 0 0;
   color: var(--color-danger);
   font-size: 0.85rem;
+}
+
+.equation-tool-button {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.08em;
+}
+
+.excalidraw .equation-tool-button.selected {
+  color: var(--color-on-primary-container, #ffffff);
+  background-color: var(--button-selected-bg, var(--color-primary-container, #4f46e5));
+  border-color: var(--button-selected-border, var(--color-primary, #4f46e5));
 }
 
 @keyframes editor-sync-spin {
@@ -704,7 +712,7 @@ button:not(:disabled):active {
     padding: 8px;
   }
 
-  .equation-dialog {
+  .equation-editor {
     padding: 20px;
   }
 
