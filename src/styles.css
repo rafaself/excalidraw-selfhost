@@ -692,6 +692,13 @@ button:not(:disabled):active {
 }
 
 @media (max-width: 760px) {
+  .excalidraw .equation-tool-button {
+    position: fixed;
+    z-index: 3;
+    top: 68px;
+    left: 16px;
+  }
+
   .library-page {
     padding: 16px;
   }
