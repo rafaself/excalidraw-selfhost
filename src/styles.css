@@ -560,6 +560,24 @@ button:not(:disabled):active {
   width: 100%;
 }
 
+.equation-recovery-status {
+  position: fixed;
+  z-index: 15;
+  top: 16px;
+  left: 50%;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 14px;
+  color: var(--color-danger-strong);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: center;
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-item);
+  transform: translateX(-50%);
+}
+
 .editor-menu-sync-item.saved,
 .editor-menu-sync-item.saved:disabled {
   color: var(--color-success);

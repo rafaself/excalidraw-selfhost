@@ -108,9 +108,12 @@ function normalizeSvg(
     throw new Error("MathJax returned malformed SVG.");
   }
 
-  const svg = parsed.documentElement;
+  const svg =
+    parsed.documentElement.localName === "svg"
+      ? parsed.documentElement
+      : parsed.querySelector("svg");
 
-  if (svg.localName !== "svg") {
+  if (!svg) {
     throw new Error("MathJax did not return an SVG image.");
   }
 

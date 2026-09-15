@@ -106,6 +106,24 @@ function restoreDocument(document: ExcalidrawDocument): ReturnType<typeof restor
   });
 }
 
+function isEquationAssetAvailable(
+  fileId: string | null,
+  files: ReturnType<ExcalidrawImperativeAPI["getFiles"]>,
+): boolean {
+  if (fileId === null) {
+    return false;
+  }
+
+  const file = files[fileId];
+
+  return (
+    file !== undefined &&
+    file.mimeType === "image/svg+xml" &&
+    typeof file.dataURL === "string" &&
+    file.dataURL.trim() !== ""
+  );
+}
+
 function HomeIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
@@ -221,6 +239,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   const [selectedEquationId, setSelectedEquationId] = useState<string | null>(null);
   const [equationEditorSession, setEquationEditorSession] =
     useState<EquationEditorSession | null>(null);
+  const [equationRecoveryError, setEquationRecoveryError] = useState<string | null>(null);
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI | null>(null);
 
   const latestSceneRef = useRef<SceneSnapshot | null>(null);
@@ -238,6 +257,7 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
   } | null>(null);
   const spaceHeldRef = useRef(false);
   const activeToolKeyRef = useRef<string | null>(null);
+  const equationRecoveryKeyRef = useRef<string | null>(null);
 
   function clearAutosaveTimer() {
     if (debounceTimerRef.current !== null) {
@@ -469,8 +489,10 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
     setIsEquationToolActive(false);
     setSelectedEquationId(null);
     setEquationEditorSession(null);
+    setEquationRecoveryError(null);
     equationPointerDownRef.current = null;
     activeToolKeyRef.current = null;
+    equationRecoveryKeyRef.current = null;
     setLoadError(null);
     reportSaveState("saved");
 
@@ -517,6 +539,94 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
       }
     };
   }, [loaded?.diagram.id]);
+
+  useEffect(() => {
+    if (
+      !loaded ||
+      loaded.diagram.workspaceId !== workspaceId ||
+      loaded.diagram.id !== diagramId ||
+      !excalidrawAPI
+    ) {
+      return;
+    }
+
+    const recoveryKey = `${workspaceId}:${diagramId}:${loadAttempt}`;
+
+    if (equationRecoveryKeyRef.current === recoveryKey) {
+      return;
+    }
+
+    let recoveryFrame = 0;
+    let waitedFrames = 0;
+    let cancelled = false;
+
+    const recover = async () => {
+      if (cancelled || equationRecoveryKeyRef.current === recoveryKey) {
+        return;
+      }
+
+      equationRecoveryKeyRef.current = recoveryKey;
+      const files = excalidrawAPI.getFiles();
+      const hasMissingEquation = excalidrawAPI
+        .getSceneElements()
+        .some(
+          (element) =>
+            element.type === "image" &&
+            isEquationElement(element) &&
+            !isEquationAssetAvailable(element.fileId, files),
+        );
+
+      if (!hasMissingEquation) {
+        return;
+      }
+
+      try {
+        const { recoverMissingEquationAssets } = await import("../equations/recovery");
+        const result = await recoverMissingEquationAssets(excalidrawAPI);
+
+        if (cancelled || (result.failedCount === 0 && result.skippedCount === 0)) {
+          return;
+        }
+
+        setEquationRecoveryError(
+          "Some equation assets could not be restored. Edit the affected equations to try again.",
+        );
+      } catch {
+        if (!cancelled) {
+          setEquationRecoveryError(
+            "Some equation assets could not be restored. Edit the affected equations to try again.",
+          );
+        }
+      }
+    };
+
+    const waitForScene = () => {
+      if (cancelled) {
+        return;
+      }
+
+      const expectedSceneElementCount = loaded.initialData.elements.filter(
+        (element) => !element.isDeleted,
+      ).length;
+      const sceneReady =
+        excalidrawAPI.getSceneElements().length >= expectedSceneElementCount;
+
+      if (!sceneReady && waitedFrames < 60) {
+        waitedFrames += 1;
+        recoveryFrame = window.requestAnimationFrame(waitForScene);
+        return;
+      }
+
+      void recover();
+    };
+
+    recoveryFrame = window.requestAnimationFrame(waitForScene);
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(recoveryFrame);
+    };
+  }, [diagramId, excalidrawAPI, loadAttempt, loaded, workspaceId]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -874,6 +984,11 @@ export function EditorPage({ workspaceId, diagramId }: EditorPageProps) {
 
   return (
     <main className="editor-page">
+      {equationRecoveryError ? (
+        <div className="equation-recovery-status" role="alert" aria-live="polite">
+          {equationRecoveryError}
+        </div>
+      ) : null}
       {!loaded ? (
         <section className="editor-state" role={loadError ? "alert" : "status"}>
           {loadError ? (
