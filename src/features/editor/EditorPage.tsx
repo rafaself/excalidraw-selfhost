@@ -22,6 +22,7 @@ import {
   type ExcalidrawDocument,
 } from "../../services/api";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { isEquationAssetAvailable } from "../equations/assets";
 import {
   isEquationCanvasClick,
   isScenePositionInsideEquation,
@@ -104,24 +105,6 @@ function restoreDocument(document: ExcalidrawDocument): ReturnType<typeof restor
   return restore(document as Parameters<typeof restore>[0], null, null, {
     repairBindings: true,
   });
-}
-
-function isEquationAssetAvailable(
-  fileId: string | null,
-  files: ReturnType<ExcalidrawImperativeAPI["getFiles"]>,
-): boolean {
-  if (fileId === null) {
-    return false;
-  }
-
-  const file = files[fileId];
-
-  return (
-    file !== undefined &&
-    file.mimeType === "image/svg+xml" &&
-    typeof file.dataURL === "string" &&
-    file.dataURL.trim() !== ""
-  );
 }
 
 function HomeIcon() {

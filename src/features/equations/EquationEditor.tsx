@@ -1,4 +1,4 @@
-import "mathlive";
+import { MathfieldElement as MathfieldElementClass } from "mathlive";
 import {
   useEffect,
   useLayoutEffect,
@@ -9,6 +9,9 @@ import {
 } from "react";
 import type { MathfieldElement } from "mathlive";
 import type { EquationViewportPosition } from "./models";
+
+MathfieldElementClass.fontsDirectory = "/mathlive/fonts/";
+MathfieldElementClass.soundsDirectory = "/mathlive/sounds/";
 
 type EquationEditorProps = {
   initialLatex: string;

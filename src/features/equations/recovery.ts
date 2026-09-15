@@ -3,6 +3,7 @@ import {
   newElementWith,
 } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import { isEquationAssetAvailable } from "./assets";
 import { createEquationFile } from "./image";
 import { getEquationData } from "./metadata";
 import { renderEquation } from "./renderer";
@@ -31,24 +32,6 @@ type PreparedRecovery = {
   file: Awaited<ReturnType<typeof createEquationFile>>;
 };
 
-function isUnavailableEquationFile(
-  element: SceneImageElement,
-  files: ReturnType<ExcalidrawImperativeAPI["getFiles"]>,
-): boolean {
-  if (element.fileId === null) {
-    return true;
-  }
-
-  const file = files[element.fileId];
-
-  return (
-    file === undefined ||
-    file.mimeType !== "image/svg+xml" ||
-    typeof file.dataURL !== "string" ||
-    file.dataURL.trim() === ""
-  );
-}
-
 function getMissingEquationCandidates(
   excalidrawAPI: ExcalidrawImperativeAPI,
 ): { candidates: RecoveryCandidate[]; skippedCount: number } {
@@ -59,7 +42,7 @@ function getMissingEquationCandidates(
       (element): element is SceneImageElement =>
         element.type === "image" && getEquationData(element) !== null,
     )
-    .filter((element) => isUnavailableEquationFile(element, files))
+    .filter((element) => !isEquationAssetAvailable(element.fileId, files))
     .map((element) => {
       const data = getEquationData(element);
       return data ? { element, latex: data.latex } : null;
@@ -112,7 +95,7 @@ export async function recoverMissingEquationAssets(
     if (
       !data ||
       data.latex !== recovery.latex ||
-      !isUnavailableEquationFile(element, currentFiles)
+      isEquationAssetAvailable(element.fileId, currentFiles)
     ) {
       continue;
     }

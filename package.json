@@ -13,6 +13,7 @@
     "dev:remote": "node scripts/dev-remote.mjs",
     "build": "pnpm run typecheck && vite build",
     "test:api-limits": "node scripts/validate-api-limits.mjs",
+    "test:equations": "vitest run",
     "preview": "vite preview",
     "lint": "eslint src functions",
     "typecheck": "tsc --noEmit && tsc -p functions/tsconfig.json",
@@ -31,9 +32,11 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.4",
     "eslint": "^9.39.5",
+    "happy-dom": "20.14.5",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.65.0",
     "vite": "^8.1.5",
+    "vitest": "4.1.11",
     "wrangler": "^4.118.0"
   }
 }

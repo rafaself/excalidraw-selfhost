@@ -47,5 +47,8 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Test equations
+        run: pnpm test:equations
+
       - name: Validate API request limits
         run: pnpm test:api-limits

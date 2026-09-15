@@ -166,6 +166,24 @@ Equations remain ordinary Excalidraw image elements, so the existing PNG, SVG, S
 
 The first frontend build keeps the equation dependencies out of the initial application chunk; the MathLive authoring and MathJax rendering code is emitted in lazy chunk(s) and fetched on demand. In the current production build, those chunks are approximately 803 kB (220 kB gzip) for MathLive and 1.36 MB (486 kB gzip) for MathJax and insertion helpers.
 
+Equation maintenance follows a single browser-to-document path:
+
+```text
+MathLive value
+      ↓ canonical LaTeX in React state
+MathJax base + ams
+      ↓ normalized self-contained SVG
+Excalidraw image file + { version: 1, latex } metadata
+      ↓ existing local JSON autosave
+R2 document.excalidraw
+```
+
+The editor never stores the live MathLive DOM or runtime app state. The versioned metadata is the only signal that an image is an editable equation; ordinary images and malformed metadata are deliberately ignored. The normalized SVG rejects embedded HTML, external URLs, and non-local asset references, so rendering is local and the saved image is self-contained. Equation edits update the image file reference and source metadata together through the existing Excalidraw scene update, while the R2 API and autosave implementation remain unchanged. MathLive's KaTeX fonts and keyboard sounds are copied into the generated `public/mathlive/` tree during install and served from same-origin `/mathlive/` paths.
+
+MathLive (`0.110.0`) is MIT-licensed and MathJax (`@mathjax/src` `4.1.3`) is Apache-2.0-licensed. The equation test tooling is development-only: Vitest (`4.1.11`) and happy-dom (`20.14.5`) are MIT-licensed and are not included in production bundles. Dependency versions and integrity data are committed in `pnpm-lock.yaml`; no equation service, remote renderer, credential, or backend persistence dependency is introduced.
+
+The release review also runs `pnpm audit --prod`. On the current dependency graph it reports 11 moderate/high advisories in pre-existing transitive Excalidraw dependencies (`lodash-es` through Mermaid and several `nanoid` versions); it reports no issue caused by MathLive or MathJax. Those packages are owned by the current Excalidraw release and are not overridden here: forcing incompatible major versions would be less safe than retaining the vendor-supported graph. They should be revisited before broad public exposure of the deployment, independently of the equation slice.
+
 ## API
 
 All application persistence is same-origin under `/api`:
@@ -216,6 +234,7 @@ Two GitHub Actions workflows keep validation and production credentials separate
 
 ```text
 pull request → pnpm install --frozen-lockfile → lint → typecheck → build
+              → focused equation tests → API request-limit tests
 main         → pnpm install --frozen-lockfile → lint → typecheck → build → Wrangler Pages deploy
 ```
 
@@ -270,10 +289,11 @@ pnpm install --frozen-lockfile
 pnpm lint
 pnpm typecheck
 pnpm build
+pnpm test:equations
 pnpm test:api-limits
 ```
 
-The equation slice is intentionally covered by the existing frontend build and type checks rather than adding a test framework. Manual validation with `pnpm dev:pages` should cover structured fractions, roots, exponents, subscripts, integrals, symbols, cursor navigation, empty or invalid input, insertion failures, ordinary image insertion, duplicate/edit independence, undo/redo, PNG/SVG/Save as image exports, autosave, reload, and restored equation images. A controlled fixture with valid equation metadata and a removed referenced file should regenerate once on load and persist healthy after the next save. `pnpm build` should continue to report the equation code as lazy chunks separate from the initial application code.
+`test:equations` runs the focused Vitest suite for metadata validation, SVG asset checks, placement boundaries, scaled updates, MathJax output, and bounded recovery failures. The suite uses only equation-owned modules and mocks the Excalidraw imperative boundary where the full browser runtime cannot be loaded in Node. The running application remains the integration check for Excalidraw's public serialization and restore path: manual validation with `pnpm dev:pages` should cover structured fractions, roots, exponents, subscripts, integrals, symbols, cursor navigation, empty or invalid input, insertion failures, ordinary image insertion, duplicate/edit independence, undo/redo, PNG/SVG/Save as image exports, autosave, reload, and restored equation images. A controlled fixture with valid equation metadata and a removed referenced file should regenerate once on load and persist healthy after the next save. `pnpm build` should continue to report the equation code as lazy chunks separate from the initial application code.
 
 The typecheck command validates frontend code and Pages Functions separately so browser and Workers runtime globals do not conflict.
 

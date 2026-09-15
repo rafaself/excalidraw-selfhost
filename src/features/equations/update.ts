@@ -29,7 +29,7 @@ function findEquationElement(
   return { element, latex: equation.latex };
 }
 
-function scaledDimension(
+export function scaleEquationDimension(
   currentDimension: number,
   previousDimension: number,
   nextDimension: number,
@@ -57,8 +57,8 @@ export async function updateEquation(
   const file = await createEquationFile(nextRender);
   const updatedElement = newElementWith(element, {
     fileId: file.id,
-    width: scaledDimension(element.width, previousRender.width, nextRender.width),
-    height: scaledDimension(element.height, previousRender.height, nextRender.height),
+    width: scaleEquationDimension(element.width, previousRender.width, nextRender.width),
+    height: scaleEquationDimension(element.height, previousRender.height, nextRender.height),
     crop: null,
     status: "pending",
     customData: {
