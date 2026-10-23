@@ -14,20 +14,20 @@ const sourceFonts = join(
   "fonts",
 );
 const targetFonts = join(assetsRoot, "fonts");
-const mathliveRoot = join(projectRoot, "public", "mathlive");
-const mathlivePackage = join(projectRoot, "node_modules", "mathlive");
+const pdfjsAssetsRoot = join(projectRoot, "public", "pdfjs-assets");
+const pdfjsPackage = join(projectRoot, "node_modules", "pdfjs-dist");
 
 await mkdir(assetsRoot, { recursive: true });
 await rm(targetFonts, { recursive: true, force: true });
 await cp(sourceFonts, targetFonts, { recursive: true });
-await rm(mathliveRoot, { recursive: true, force: true });
-await mkdir(mathliveRoot, { recursive: true });
-await cp(join(mathlivePackage, "fonts"), join(mathliveRoot, "fonts"), {
-  recursive: true,
-});
-await cp(join(mathlivePackage, "sounds"), join(mathliveRoot, "sounds"), {
-  recursive: true,
-});
+
+for (const assetDirectory of ["cmaps", "iccs", "standard_fonts", "wasm"]) {
+  const targetDirectory = join(pdfjsAssetsRoot, assetDirectory);
+  await rm(targetDirectory, { recursive: true, force: true });
+  await cp(join(pdfjsPackage, assetDirectory), targetDirectory, {
+    recursive: true,
+  });
+}
 
 console.log("Excalidraw fonts copied to public/excalidraw-assets/fonts");
-console.log("MathLive assets copied to public/mathlive");
+console.log("PDF.js rendering assets copied to public/pdfjs-assets");
