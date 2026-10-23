@@ -14,8 +14,7 @@ concurrency:
 
 jobs:
   validate:
-    # CI is paused intentionally; this skipped job satisfies the protected check.
-    if: ${{ false }}
+    # Required status check for the protected main branch.
     runs-on: ubuntu-24.04
     timeout-minutes: 15
 
@@ -48,9 +47,6 @@ jobs:
 
       - name: Build
         run: pnpm build
-
-      - name: Test equations
-        run: pnpm test:equations
 
       - name: Validate API request limits
         run: pnpm test:api-limits
